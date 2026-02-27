@@ -64,7 +64,10 @@ Intents:
    - Resolve partial dates (e.g. "12", "15th") based on Today: Feb 28, 2026. If the user says "12", they mean 2026-03-12.
    - RETAIN "from" and "to" from context if not mentioned in the latest message.
 2. "hotel" — user wants to book or find a hotel.
-   Return: {"intent":"hotel", "location":"<city>", "check_in":"YYYY-MM-DD", "check_out":"YYYY-MM-DD"}
+   Return: {"intent":"hotel", "location":"<city>", "check_in":"YYYY-MM-DD", "check_out":"YYYY-MM-DD", "max_price":<number|null>}
+   Important: 
+   - RETAIN "location", "check_in", "check_out" from context if not mentioned in the latest message.
+   - Extract "max_price" if specified (e.g. "less than 2k" -> 2000).
 3. "outfit" — shopping/styling request.
    Return: {"intent":"outfit", "gender":"male|female|unknown", "occasion":"wedding|party|formal|casual|everyday|unknown"}
 4. "search" — specific product search.
@@ -105,15 +108,33 @@ If info like destination or dates are missing for travel, return "clarify" with 
 
         // Step 2b: Hotel Flow
         if (intent === "hotel") {
-            const { location, check_in, check_out } = parsed;
-            if (!location || !check_in || location === "unknown") {
-                return NextResponse.json({ type: "chat", reply: "Which city are you looking for hotels in, and for which dates? 🏨" });
+            let { location, check_in, check_out, max_price } = parsed;
+
+            // Intelligence: If check_in is provided but check_out isn't, default to 1 night stay
+            if (check_in && check_in !== "unknown" && (!check_out || check_out === "unknown")) {
+                try {
+                    const d = new Date(check_in);
+                    d.setDate(d.getDate() + 1);
+                    check_out = d.toISOString().split('T')[0];
+                } catch {
+                    check_out = undefined;
+                }
             }
-            const hotels = await searchHotels(location, check_in, check_out);
+
+            if (!location || location === "unknown") {
+                return NextResponse.json({ type: "chat", reply: "Which city are you looking for hotels in? 🏨" });
+            }
+            if (!check_in || check_in === "unknown") {
+                return NextResponse.json({ type: "chat", reply: `When are you planning to visit ${location}? (I'll find you the best deals for those dates!) 🗓️` });
+            }
+
+            const hotels = await searchHotels(location, check_in, check_out, max_price);
             return NextResponse.json({
                 type: "hotels",
                 hotels,
-                followUp: "Found these top-rated stays! Let me know if you want to filter by price or rating."
+                followUp: hotels.length > 0
+                    ? `Found these stays in ${location} within your budget! Let me know if you want to see other options.`
+                    : `I couldn't find any hotels in ${location} under ₹${max_price} for those dates. Want to try a slightly higher budget or different dates?`
             });
         }
 

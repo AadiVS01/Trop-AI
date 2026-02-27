@@ -71,10 +71,10 @@ export async function searchFlights(from: string, to: string, date: string, retu
     return results.slice(0, 5);
 }
 
-export async function searchHotels(location: string, checkIn: string, checkOut: string): Promise<HotelResult[]> {
+export async function searchHotels(location: string, checkIn: string, checkOut: string, maxPrice?: number): Promise<HotelResult[]> {
     if (!SERP_API_KEY) throw new Error("SERP_API_KEY not set");
 
-    const params = new URLSearchParams({
+    const params: any = {
         engine: "google_hotels",
         q: `hotels in ${location}`,
         check_in_date: checkIn,
@@ -82,11 +82,26 @@ export async function searchHotels(location: string, checkIn: string, checkOut: 
         currency: "INR",
         hl: "en",
         gl: "in",
+        rating: "7", // Filter for 3.5+ stars (quality baseline)
         api_key: SERP_API_KEY,
-    });
+    };
 
-    const res = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+    if (maxPrice) {
+        params.max_price = maxPrice.toString();
+    } else {
+        params.sort_by = "8"; // If no price limit, prioritize highest rating
+    }
+
+    console.log(`🏨 Hotel Search: ${location} | ${checkIn} to ${checkOut || 'N/A'} | Budget: ${maxPrice || 'None'}`);
+
+    const res = await fetch(`https://serpapi.com/search.json?${new URLSearchParams(params).toString()}`);
     const data = await res.json();
+
+    if (data.properties && data.properties.length > 0) {
+        console.log(`✅ Found ${data.properties.length} hotels. First link preview: ${data.properties[0].link?.slice(0, 100)}...`);
+    } else {
+        console.log(`⚠️ No hotels found in raw SerpAPI response. Error: ${data.error || 'None'}`);
+    }
 
     const results: HotelResult[] = (data.properties || []).map((h: any) => ({
         name: h.name,

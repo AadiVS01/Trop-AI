@@ -299,23 +299,29 @@ function FlightResults({ flights }: { flights: FlightResult[] }) {
 function HotelResults({ hotels }: { hotels: HotelResult[] }) {
   if (!hotels.length) return null;
   return (
-    <div style={{ display: "flex", overflowX: "auto", gap: "1rem", paddingBottom: "0.5rem", WebkitOverflowScrolling: "touch" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
       {hotels.map((h, i) => (
-        <a key={i} href={h.link} target="_blank" style={s.hotelCard}>
-          <div style={{ width: "240px", flexShrink: 0 }}>
-            {h.thumbnail ? (
-              <img src={h.thumbnail} alt={h.name} style={s.hotelImg} />
-            ) : (
-              <div style={{ ...s.hotelImg, display: "flex", alignItems: "center", justifyContent: "center", background: "#222" }}>🏨</div>
-            )}
-            <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              <span style={s.hotelName}>{h.name}</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={s.hotelPrice}>{h.price}</span>
-                {h.rating && <span style={s.hotelRating}>⭐ {h.rating}</span>}
-              </div>
-              <p style={s.hotelDesc}>{h.description}</p>
+        <a key={i} href={h.link} target="_blank" style={p.card}>
+          {h.thumbnail ? (
+            <img src={h.thumbnail} alt={h.name} style={p.img} />
+          ) : (
+            <div style={{ ...p.img, display: "flex", alignItems: "center", justifyContent: "center", background: "#222" }}>🏨</div>
+          )}
+          <div style={p.info}>
+            <div style={p.title}>{h.name}</div>
+            <div style={p.meta}>
+              <span style={p.price}>{h.price}</span>
+              {h.rating && (
+                <span style={p.rating}>
+                  ⭐ {h.rating} ({h.reviews})
+                </span>
+              )}
             </div>
+            {h.description && (
+              <p style={{ ...s.hotelDesc, height: "auto", WebkitLineClamp: 1, display: "-webkit-box", WebkitBoxOrient: "vertical", margin: 0 }}>
+                {h.description}
+              </p>
+            )}
           </div>
         </a>
       ))}
