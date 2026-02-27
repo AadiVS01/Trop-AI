@@ -7,7 +7,7 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type MessageItem =
   | { kind: "chat"; role: "user" | "assistant"; content: string }
-  | { kind: "products"; query: string; products: NormalizedProduct[] };
+  | { kind: "products"; query: string; products: NormalizedProduct[]; followUp?: string };
 
 type Mode = "landing" | "chat";
 
@@ -47,7 +47,7 @@ export default function ChatPage() {
       const data = await res.json();
 
       if (data.type === "products") {
-        setItems([...newItems, { kind: "products", query: data.query, products: data.products }]);
+        setItems([...newItems, { kind: "products", query: data.query, products: data.products, followUp: data.followUp }]);
       } else {
         const reply = data.reply ?? "Something went wrong.";
         setItems([...newItems, { kind: "chat", role: "assistant", content: reply }]);
@@ -116,7 +116,17 @@ export default function ChatPage() {
                 );
               }
               if (item.kind === "products") {
-                return <ProductResults key={i} query={item.query} products={item.products} />;
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <ProductResults query={item.query} products={item.products} />
+                    {item.followUp && (
+                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
+                        <div style={s.avatar}>T</div>
+                        <div style={s.bubbleBot}>{item.followUp}</div>
+                      </div>
+                    )}
+                  </div>
+                );
               }
               return null;
             })}
