@@ -2,12 +2,16 @@
 
 import { useState, useRef, useEffect } from "react";
 import { NormalizedProduct } from "@/lib/shopping/serpProvider";
+import { FlightResult, HotelResult } from "@/lib/travel/serpTravelProvider";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type MessageItem =
   | { kind: "chat"; role: "user" | "assistant"; content: string }
-  | { kind: "products"; query: string; products: NormalizedProduct[]; followUp?: string };
+  | { kind: "products"; query: string; products: NormalizedProduct[]; followUp?: string }
+  | { kind: "outfit"; template: any; stylistNote?: string; bundles: { category: string; products: NormalizedProduct[] }[] }
+  | { kind: "flights"; flights: FlightResult[]; followUp?: string }
+  | { kind: "hotels"; hotels: HotelResult[]; followUp?: string };
 
 type Mode = "landing" | "chat";
 
@@ -48,6 +52,12 @@ export default function ChatPage() {
 
       if (data.type === "products") {
         setItems([...newItems, { kind: "products", query: data.query, products: data.products, followUp: data.followUp }]);
+      } else if (data.type === "outfit") {
+        setItems([...newItems, { kind: "outfit", template: data.template, stylistNote: data.stylistNote, bundles: data.bundles }]);
+      } else if (data.type === "flights") {
+        setItems([...newItems, { kind: "flights", flights: data.flights, followUp: data.followUp }]);
+      } else if (data.type === "hotels") {
+        setItems([...newItems, { kind: "hotels", hotels: data.hotels, followUp: data.followUp }]);
       } else {
         const reply = data.reply ?? "Something went wrong.";
         setItems([...newItems, { kind: "chat", role: "assistant", content: reply }]);
@@ -128,6 +138,60 @@ export default function ChatPage() {
                   </div>
                 );
               }
+              if (item.kind === "outfit") {
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%" }}>
+                    <div style={{ marginLeft: "1rem" }}>
+                      <strong style={{ display: "block", fontSize: "1.1rem", color: "#fff" }}>{item.template.name}</strong>
+                    </div>
+
+                    {item.bundles.map((bundle, bi) => (
+                      <div key={bi} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#888", marginLeft: "1rem" }}>
+                          {bundle.category}
+                        </span>
+                        <ProductResults query="" products={bundle.products} />
+                      </div>
+                    ))}
+
+                    <div style={{ ...s.bubbleBot, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", marginTop: "-0.5rem" }}>
+                      <p style={{ fontSize: "0.85rem", opacity: 0.8, marginBottom: item.stylistNote ? "1rem" : 0 }}>{item.template.description}</p>
+                      {item.stylistNote && (
+                        <div style={{ padding: "0.75rem", background: "rgba(0,123,255,0.1)", borderLeft: "3px solid #007bff", borderRadius: "4px" }}>
+                          <strong style={{ display: "block", fontSize: "0.75rem", color: "#007bff", textTransform: "uppercase", marginBottom: "0.25rem" }}>Stylist's Tip</strong>
+                          <p style={{ fontSize: "0.85rem", color: "#eee", fontStyle: "italic" }}>"{item.stylistNote}"</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              if (item.kind === "flights") {
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <FlightResults flights={item.flights} />
+                    {item.followUp && (
+                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
+                        <div style={s.avatar}>T</div>
+                        <div style={s.bubbleBot}>{item.followUp}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.kind === "hotels") {
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <HotelResults hotels={item.hotels} />
+                    {item.followUp && (
+                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
+                        <div style={s.avatar}>T</div>
+                        <div style={s.bubbleBot}>{item.followUp}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               return null;
             })}
             {loading && (
@@ -194,6 +258,67 @@ function ProductResults({ query, products }: { query: string; products: Normaliz
       <div style={p.list}>
         {products.map((prod) => <ProductCard key={prod.id} prod={prod} />)}
       </div>
+    </div>
+  );
+}
+
+function FlightResults({ flights }: { flights: FlightResult[] }) {
+  if (!flights.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
+      {flights.map((f, i) => (
+        <a key={i} href={f.link} target="_blank" style={s.travelCard}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              {f.logo && <img src={f.logo} alt={f.airline} style={{ width: 24, height: 24, borderRadius: "4px" }} />}
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>{f.airline}</span>
+            </div>
+            <span style={s.travelPrice}>{f.price}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.75rem", alignItems: "center" }}>
+            <div style={s.timeBlock}>
+              <span style={s.time}>{f.departure.time}</span>
+              <span style={s.airport}>{f.departure.airport}</span>
+            </div>
+            <div style={s.durationLine}>
+              <div style={s.line} />
+              <span style={s.durationText}>{f.duration}</span>
+              <div style={s.line} />
+            </div>
+            <div style={s.timeBlock} className="text-right">
+              <span style={s.time}>{f.arrival.time}</span>
+              <span style={s.airport}>{f.arrival.airport}</span>
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function HotelResults({ hotels }: { hotels: HotelResult[] }) {
+  if (!hotels.length) return null;
+  return (
+    <div style={{ display: "flex", overflowX: "auto", gap: "1rem", paddingBottom: "0.5rem", WebkitOverflowScrolling: "touch" }}>
+      {hotels.map((h, i) => (
+        <a key={i} href={h.link} target="_blank" style={s.hotelCard}>
+          <div style={{ width: "240px", flexShrink: 0 }}>
+            {h.thumbnail ? (
+              <img src={h.thumbnail} alt={h.name} style={s.hotelImg} />
+            ) : (
+              <div style={{ ...s.hotelImg, display: "flex", alignItems: "center", justifyContent: "center", background: "#222" }}>🏨</div>
+            )}
+            <div style={{ padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+              <span style={s.hotelName}>{h.name}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={s.hotelPrice}>{h.price}</span>
+                {h.rating && <span style={s.hotelRating}>⭐ {h.rating}</span>}
+              </div>
+              <p style={s.hotelDesc}>{h.description}</p>
+            </div>
+          </div>
+        </a>
+      ))}
     </div>
   );
 }
@@ -306,6 +431,89 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0, transition: "opacity 0.2s",
   },
   hint: { fontSize: "0.75rem", color: "#3a3a3a" },
+  travelCard: {
+    background: "#111",
+    border: "1px solid #222",
+    borderRadius: "12px",
+    padding: "1rem",
+    textDecoration: "none",
+    display: "flex",
+    flexDirection: "column",
+    transition: "border-color 0.2s",
+  },
+  travelPrice: {
+    color: "#4ade80",
+    fontWeight: 700,
+    fontSize: "1rem",
+  },
+  timeBlock: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  time: {
+    fontSize: "1.1rem",
+    fontWeight: 700,
+    color: "#fff",
+  },
+  airport: {
+    fontSize: "0.75rem",
+    color: "#666",
+    textTransform: "uppercase",
+  },
+  durationLine: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    flex: 1,
+    padding: "0 1rem",
+  },
+  line: {
+    height: "1px",
+    background: "#333",
+    flex: 1,
+  },
+  durationText: {
+    fontSize: "0.7rem",
+    color: "#555",
+    whiteSpace: "nowrap",
+  },
+  hotelCard: {
+    background: "#111",
+    border: "1px solid #222",
+    borderRadius: "12px",
+    textDecoration: "none",
+    overflow: "hidden",
+    transition: "border-color 0.2s",
+  },
+  hotelImg: {
+    width: "100%",
+    height: "140px",
+    objectFit: "cover",
+  },
+  hotelName: {
+    fontSize: "0.9rem",
+    fontWeight: 600,
+    color: "#fff",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  hotelPrice: {
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    color: "#4ade80",
+  },
+  hotelRating: {
+    fontSize: "0.75rem",
+    color: "#facc15",
+  },
+  hotelDesc: {
+    fontSize: "0.75rem",
+    color: "#666",
+    lineHeight: 1.4,
+    height: "2.8rem",
+    overflow: "hidden",
+  },
 };
 
 const p: Record<string, React.CSSProperties> = {

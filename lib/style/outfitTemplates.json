@@ -1,0 +1,157 @@
+[
+  {
+    "id": "male-wedding-ethnic",
+    "name": "Traditional Wedding Ethnic",
+    "gender": "male",
+    "occasion": "wedding",
+    "style": "ethnic",
+    "tags": [
+      "wedding",
+      "ethnic",
+      "formal",
+      "indian"
+    ],
+    "description": "Rich fabrics and festive colors for a grand Indian wedding.",
+    "looks": [
+      {
+        "name": "The Royal Maroon & Gold Look",
+        "stylistNote": "The deep maroon kurta provides a regal contrast against cream-colored pajamas and gold accessories, embodying a classic monochromatic-accented palette.",
+        "items": [
+          {
+            "category": "Kurta Jacket Set",
+            "query": "Men's maroon kurta pajama with gold nehru jacket"
+          },
+          {
+            "category": "Footwear",
+            "query": "Cream or gold men's mojaris"
+          },
+          {
+            "category": "Watch",
+            "query": "Men's gold strap formal watch"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "female-wedding-ethnic",
+    "name": "Elegant Wedding Saree",
+    "gender": "female",
+    "occasion": "wedding",
+    "style": "ethnic",
+    "tags": [
+      "wedding",
+      "ethnic",
+      "formal",
+      "indian",
+      "saree"
+    ],
+    "description": "Timeless saree look with elegant jewellery.",
+    "looks": [
+      {
+        "name": "The Crimson & Emerald Look",
+        "stylistNote": "A crimson silk saree paired with emerald-toned kundan jewellery creates a bold complementary color scheme, perfect for a high-energy occasion like a wedding.",
+        "items": [
+          {
+            "category": "Saree",
+            "query": "Crimson red silk saree with gold border"
+          },
+          {
+            "category": "Jewellery",
+            "query": "Green kundan necklace set with earrings"
+          },
+          {
+            "category": "Clutch",
+            "query": "Gold embroidered potli bag"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "male-everyday-casual",
+    "name": "Everyday Essentials",
+    "gender": "male",
+    "occasion": "everyday",
+    "style": "casual",
+    "tags": [
+      "everyday",
+      "casual",
+      "college",
+      "work"
+    ],
+    "description": "Comfortable and balanced casual wear.",
+    "looks": [
+      {
+        "name": "The Navy & Slate Look",
+        "stylistNote": "An analogous pairing of navy and slate grey creates a calm, sleek aesthetic. The white sneakers add a 'pop' of neutral balance.",
+        "items": [
+          {
+            "category": "T-Shirt",
+            "query": "Men's navy blue basic cotton t-shirt"
+          },
+          {
+            "category": "Jeans",
+            "query": "Men's slate grey slim fit denims"
+          },
+          {
+            "category": "Sneakers",
+            "query": "Minimalist white sneakers for men"
+          }
+        ]
+      },
+      {
+        "name": "The Earthy Olive Look",
+        "stylistNote": "Olive green and beige are classic neutrals that suggest an organic, grounded vibe. Great for daytime casual outings.",
+        "items": [
+          {
+            "category": "T-Shirt",
+            "query": "Men's olive green crew neck t-shirt"
+          },
+          {
+            "category": "Chinos",
+            "query": "Men's beige slim fit chinos"
+          },
+          {
+            "category": "Shoes",
+            "query": "Men's brown casual loafers"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "female-everyday-casual",
+    "name": "Casual Day Out",
+    "gender": "female",
+    "occasion": "everyday",
+    "style": "casual",
+    "tags": [
+      "everyday",
+      "casual",
+      "brunch",
+      "work"
+    ],
+    "description": "Versatile and chic daily wear.",
+    "looks": [
+      {
+        "name": "The Pastel & Denim Look",
+        "stylistNote": "Soft pastel tops and light-wash denim create a fresh, youthful appearance. The 'sandwich rule' is applied with matching light-toned footwear.",
+        "items": [
+          {
+            "category": "Top",
+            "query": "Women's powder pink or pastel blue top"
+          },
+          {
+            "category": "Bottom",
+            "query": "Light blue wash boyfriend jeans"
+          },
+          {
+            "category": "Sneakers",
+            "query": "Women's white or pastel sneakers"
+          }
+        ]
+      }
+    ]
+  }
+]

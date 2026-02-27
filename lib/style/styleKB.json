@@ -1,0 +1,58 @@
+{
+    "colorTheory": {
+        "monochromatic": {
+            "definition": "Using different shades and tints of the same color.",
+            "rule": "Pair a darker shade with a lighter one for depth.",
+            "examples": [
+                "Navy Blue Shirt with Sky Blue Chinos",
+                "Light Grey Hoodie with Dark Charcoal Joggers"
+            ]
+        },
+        "complementary": {
+            "definition": "Colors opposite each other on the color wheel.",
+            "rule": "Creates a high-contrast, energetic look. Use one as the dominant color and the other as an accent.",
+            "examples": [
+                "Rust Orange Shirt with Teal Pants",
+                "Yellow Graphic Tee with Blue Jeans"
+            ]
+        },
+        "analogous": {
+            "definition": "Colors next to each other on the color wheel.",
+            "rule": "Creates a harmonious and pleasing look. Best for semi-formal or calm casual vibes.",
+            "examples": [
+                "Olive Green Jacket with Yellow-Ochre T-shirt",
+                "Purple Shirt with Blue Denim"
+            ]
+        },
+        "neutral": {
+            "definition": "Black, white, grey, beige, and navy.",
+            "rule": "These go with almost anything. Use them to balance bright colors.",
+            "examples": [
+                "White Shirt with Black Trousers",
+                "Beige Chinos with Navy Polo"
+            ]
+        }
+    },
+    "pairingRules": [
+        {
+            "name": "The Sandwich Rule",
+            "rule": "Match the color of your top item with the color of your shoes to 'sandwich' the outfit.",
+            "tip": "If wearing a black hoodie and black shoes, go with light-colored pants for contrast."
+        },
+        {
+            "name": "Dark vs Light Contrast",
+            "rule": "Pair a dark top with light bottoms, or vice versa, to create clear silhouette definitions.",
+            "tip": "Avoid wearing all very dark or all very light colors unless going for a specific monochromatic look."
+        }
+    ],
+    "occasionDressCodes": {
+        "wedding": {
+            "male": "Indian Ethnic (Kurta/Sherwani) or Formal Suit. Primary focus: Rich fabrics and jewel tones.",
+            "female": "Saree, Lehenga, or Anarkali. Primary focus: Embroidery and festive colors (Red, Gold, Pink)."
+        },
+        "party": {
+            "male": "Smart Casual or Party Wear Shirt. Focus: Prints or textured fabrics.",
+            "female": "Western Dress or Chic Separates. Focus: Modern silhouettes and trendy accessories."
+        }
+    }
+}
