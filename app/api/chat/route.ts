@@ -70,7 +70,13 @@ Intents:
    Important: 
    - RETAIN "location", "check_in", "check_out" from context if not mentioned in the latest message.
    - Extract "max_price" if specified (e.g. "less than 2k" -> 2000).
-3. "guide" — user wants a collection, bundle, or step-by-step guide (furniture, supplements, outfits, etc.).
+3. "train" — user wants to book or find a train.
+   Return: {"intent":"train", "from":"<station name/city>", "to":"<station name/city>", "date":"YYYY-MM-DD"}
+4. "bus" — user wants to book or find a bus.
+   Return: {"intent":"bus", "from":"<city>", "to":"<city>", "date":"YYYY-MM-DD"}
+5. "travel_generic" — user says they want to travel or plan a trip but doesn't specify if it's a flight, train, or bus.
+   Return: {"intent":"travel_generic"}
+6. "guide" — user wants a collection, bundle, or step-by-step guide (furniture, supplements, outfits, etc.).
    Return: {"intent":"guide", "category":"fashion|health|furniture|unknown", "query":"<specific interest or none>", "guideId":"<existing guide id from context|none>", "stepIndex":<number|null>}
    Important: 
    - If a guide is already active in context, return its "guideId" and the "stepIndex" the user is asking for (0-indexed).
@@ -99,6 +105,14 @@ If info like destination or dates are missing for travel, return "clarify" with 
         }
 
         const intent = parsed.intent || "chat";
+
+        // Step 2-1: Travel Generic Flow
+        if (intent === "travel_generic") {
+            return NextResponse.json({
+                type: "chat",
+                reply: "I'd love to help you plan your trip! 🌍 Where are we going? And would you like me to find you a **Flight**, **Train**, or **Bus**? ✈️🚂🚌"
+            });
+        }
 
         // Step 2a: Flight Flow
         if (intent === "flight") {
@@ -143,6 +157,35 @@ If info like destination or dates are missing for travel, return "clarify" with 
                 followUp: hotels.length > 0
                     ? `Found these stays in ${location} within your budget! Let me know if you want to see other options.`
                     : `I couldn't find any hotels in ${location} under ₹${max_price} for those dates. Want to try a slightly higher budget or different dates?`
+            });
+        }
+
+        // Step 2bc: Train & Bus Flow
+        if (intent === "train") {
+            const { from, to, date } = parsed;
+            if (!from || !to || !date || from === "unknown" || to === "unknown") {
+                return NextResponse.json({ type: "chat", reply: "I can help with train bookings! Just let me know the stations and the date. 🚂" });
+            }
+            const { searchTrains } = await import("@/lib/travel/serpTravelProvider");
+            const trains = await searchTrains(from, to, date);
+            return NextResponse.json({
+                type: "flights", // Reuse flights UI for train results
+                flights: trains,
+                followUp: "I've found the best booking links and some exclusive loots for your journey! 🚂🔥"
+            });
+        }
+
+        if (intent === "bus") {
+            const { from, to, date } = parsed;
+            if (!from || !to || !date || from === "unknown" || to === "unknown") {
+                return NextResponse.json({ type: "chat", reply: "Tell me where you want to go by bus and when! 🚌" });
+            }
+            const { searchBuses } = await import("@/lib/travel/serpTravelProvider");
+            const buses = await searchBuses(from, to, date);
+            return NextResponse.json({
+                type: "hotels", // Reuse hotel-style UI for bus cards
+                hotels: buses,
+                followUp: "Here are the best bus options and trending loots! 🚌✨"
             });
         }
 

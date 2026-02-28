@@ -78,7 +78,8 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
     let allDeals: LootDeal[] = [];
 
     if (telegramClient) {
-        const channelsToScrape = (query === "flight" || query === "hotel") ? ["desidime"] : CHANNELS;
+        const travelQueries = ["flight", "hotel", "train", "bus"];
+        const channelsToScrape = travelQueries.includes(query || "") ? ["desidime"] : CHANNELS;
 
         for (const channelName of channelsToScrape) {
             try {
@@ -186,6 +187,8 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
         let keywords = [q];
         if (q === "flight") keywords = ["flight", "airline", "airindia", "indigo", "akasa", "spicejet", "vistara", "airasia", "fly", "ticket", "boarding"];
         if (q === "hotel") keywords = ["hotel", "stay", "resort", "oyo", "mmt", "makemytrip", "booking", "accommodation"];
+        if (q === "train") keywords = ["train", "irctc", "railway", "ixigo", "confirmtkt", "redbus", "seat"];
+        if (q === "bus") keywords = ["bus", "redbus", "abhibus", "zingbus", "travels", "st", "volvo"];
 
         const filtered = allDeals.filter(d => {
             const content = `${d.title} ${d.description || ""}`.toLowerCase();
