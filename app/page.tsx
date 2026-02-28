@@ -273,7 +273,7 @@ function ProductCard({ prod }: { prod: NormalizedProduct }) {
             <span style={p.rating}>★ {prod.rating}{prod.reviews ? ` (${prod.reviews.toLocaleString()})` : ""}</span>
           )}
         </div>
-        {prod.source && <span style={p.source}>{prod.source}</span>}
+        {isLoot && <span style={p.source}>🔥 LOOT</span>}
         {prod.coupon && (
           <div style={s.couponDisplay}>
             <span style={s.couponLabel}>CODE:</span>
@@ -302,30 +302,40 @@ function FlightResults({ flights }: { flights: FlightResult[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
       {flights.map((f, i) => (
-        <a key={i} href={f.link} target="_blank" style={s.travelCard}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              {f.logo && <img src={f.logo} alt={f.airline} style={{ width: 24, height: 24, borderRadius: "4px" }} />}
-              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>{f.airline}</span>
+        <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          <a href={f.link} target="_blank" style={{ ...s.travelCard, textDecoration: "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                {f.logo && <img src={f.logo} alt={f.airline} style={{ width: 24, height: 24, borderRadius: "4px" }} />}
+                <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>{f.airline}</span>
+              </div>
+              <span style={s.travelPrice}>{f.price}</span>
             </div>
-            <span style={s.travelPrice}>{f.price}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.75rem", alignItems: "center" }}>
-            <div style={s.timeBlock}>
-              <span style={s.time}>{f.departure.time}</span>
-              <span style={s.airport}>{f.departure.airport}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.75rem", alignItems: "center" }}>
+              <div style={s.timeBlock}>
+                <span style={s.time}>{f.departure.time}</span>
+                <span style={s.airport}>{f.departure.airport}</span>
+              </div>
+              <div style={s.durationLine}>
+                <div style={s.line} />
+                <span style={s.durationText}>{f.duration}</span>
+                <div style={s.line} />
+              </div>
+              <div style={s.timeBlock} className="text-right">
+                <span style={s.time}>{f.arrival.time}</span>
+                <span style={s.airport}>{f.arrival.airport}</span>
+              </div>
             </div>
-            <div style={s.durationLine}>
-              <div style={s.line} />
-              <span style={s.durationText}>{f.duration}</span>
-              <div style={s.line} />
-            </div>
-            <div style={s.timeBlock} className="text-right">
-              <span style={s.time}>{f.arrival.time}</span>
-              <span style={s.airport}>{f.arrival.airport}</span>
-            </div>
-          </div>
-        </a>
+          </a>
+          {f.lootDeals && f.lootDeals.map((loot, li) => (
+            <a key={li} href={loot.link} target="_blank" style={s.travelLoot}>
+              <span style={s.travelLootTag}>🔥 FEATURED LOOT</span>
+              <span style={{ fontSize: "0.75rem", color: "#4ade80", fontWeight: 700 }}>{loot.price ? `${loot.price} Discount` : "Special Deal"}</span>
+              {loot.coupon && <span style={{ fontSize: "0.7rem", color: "#60a5fa", fontWeight: 600 }}>CODE: {loot.coupon}</span>}
+              <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loot.title}</span>
+            </a>
+          ))}
+        </div>
       ))}
     </div>
   );
@@ -336,29 +346,39 @@ function HotelResults({ hotels }: { hotels: HotelResult[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
       {hotels.map((h, i) => (
-        <a key={i} href={h.link} target="_blank" style={p.card}>
-          {h.thumbnail ? (
-            <img src={h.thumbnail} alt={h.name} style={p.img} />
-          ) : (
-            <div style={{ ...p.img, display: "flex", alignItems: "center", justifyContent: "center", background: "#222" }}>🏨</div>
-          )}
-          <div style={p.info}>
-            <div style={p.title}>{h.name}</div>
-            <div style={p.meta}>
-              <span style={p.price}>{h.price}</span>
-              {h.rating && (
-                <span style={p.rating}>
-                  ⭐ {h.rating} ({h.reviews})
-                </span>
+        <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          <a href={h.link} target="_blank" style={{ ...p.card, textDecoration: "none" }}>
+            {h.thumbnail ? (
+              <img src={h.thumbnail} alt={h.name} style={p.img} />
+            ) : (
+              <div style={{ ...p.img, display: "flex", alignItems: "center", justifyContent: "center", background: "#222" }}>🏨</div>
+            )}
+            <div style={p.info}>
+              <div style={p.title}>{h.name}</div>
+              <div style={p.meta}>
+                <span style={p.price}>{h.price}</span>
+                {h.rating && (
+                  <span style={p.rating}>
+                    ⭐ {h.rating} ({h.reviews})
+                  </span>
+                )}
+              </div>
+              {h.description && (
+                <p style={{ ...s.hotelDesc, height: "auto", WebkitLineClamp: 1, display: "-webkit-box", WebkitBoxOrient: "vertical", margin: 0 }}>
+                  {h.description}
+                </p>
               )}
             </div>
-            {h.description && (
-              <p style={{ ...s.hotelDesc, height: "auto", WebkitLineClamp: 1, display: "-webkit-box", WebkitBoxOrient: "vertical", margin: 0 }}>
-                {h.description}
-              </p>
-            )}
-          </div>
-        </a>
+          </a>
+          {h.lootDeals && h.lootDeals.map((loot, li) => (
+            <a key={li} href={loot.link} target="_blank" style={s.travelLoot}>
+              <span style={s.travelLootTag}>🔥 FEATURED LOOT</span>
+              <span style={{ fontSize: "0.75rem", color: "#4ade80", fontWeight: 700 }}>{loot.price ? `${loot.price} Discount` : "Special Deal"}</span>
+              {loot.coupon && <span style={{ fontSize: "0.7rem", color: "#60a5fa", fontWeight: 600 }}>CODE: {loot.coupon}</span>}
+              <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loot.title}</span>
+            </a>
+          ))}
+        </div>
       ))}
     </div>
   );
@@ -609,20 +629,39 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: "monospace",
     letterSpacing: "0.05em",
   },
+  travelLoot: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+    backgroundColor: "rgba(222, 134, 74, 0.08)",
+    border: "1px solid rgba(222, 134, 74, 0.2)",
+    borderBottomLeftRadius: "12px",
+    borderBottomRightRadius: "12px",
+    padding: "6px 12px",
+    marginTop: "-4px",
+    textDecoration: "none",
+    transition: "background-color 0.2s",
+  },
+  travelLootTag: {
+    fontSize: "0.6rem",
+    fontWeight: 800,
+    color: "#de864a",
+    letterSpacing: "0.05em",
+    backgroundColor: "rgba(222, 134, 74, 0.15)",
+    padding: "2px 6px",
+    borderRadius: "4px",
+  },
 };
 
 function LootCard({ deal }: { deal: LootDeal }) {
   return (
-    <a href={deal.link} target="_blank" style={s.lootCard}>
+    <a href={deal.link} target="_blank" style={{ ...s.lootCard, textDecoration: "none" }}>
       <div style={s.lootBadge}>LOOT</div>
       <div style={p.info}>
         <div style={p.title}>{deal.title}</div>
-        <div style={p.meta}>
-          {deal.price && <span style={s.lootPrice}>{deal.price}</span>}
-          <span style={s.lootSource}>via @{deal.channel}</span>
-        </div>
+        {deal.price && <span style={s.lootPrice}>{deal.price}</span>}
         {deal.description && (
-          <p style={{ ...s.hotelDesc, height: "auto", WebkitLineClamp: 1, display: "-webkit-box", WebkitBoxOrient: "vertical", margin: 0 }}>
+          <p style={{ ...s.hotelDesc, height: "auto", WebkitLineClamp: 1, display: "-webkit-box", WebkitBoxOrient: "vertical", margin: "0.25rem 0 0 0" }}>
             {deal.description}
           </p>
         )}

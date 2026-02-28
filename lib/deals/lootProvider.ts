@@ -19,25 +19,38 @@ const SERP_API_KEY = process.env.SERP_API_KEY;
 
 // Persistence for the Telegram client
 let client: TelegramClient | null = null;
+let connectionPromise: Promise<TelegramClient | null> | null = null;
 
 async function getTelegramClient() {
     if (client) return client;
+    if (connectionPromise) return connectionPromise;
 
-    const apiId = parseInt(process.env.TELEGRAM_API_ID || "");
-    const apiHash = process.env.TELEGRAM_API_HASH || "";
-    const session = new StringSession(process.env.TELEGRAM_SESSION || "");
+    connectionPromise = (async () => {
+        try {
+            const apiId = parseInt(process.env.TELEGRAM_API_ID || "");
+            const apiHash = process.env.TELEGRAM_API_HASH || "";
+            const session = new StringSession(process.env.TELEGRAM_SESSION || "");
 
-    if (!apiId || !apiHash || !process.env.TELEGRAM_SESSION) {
-        console.warn("[Loot] Missing Telegram API credentials. Falling back to public searches only.");
-        return null;
-    }
+            if (!apiId || !apiHash || !process.env.TELEGRAM_SESSION) {
+                console.warn("[Loot] Missing Telegram API credentials. Falling back to public searches only.");
+                return null;
+            }
 
-    client = new TelegramClient(session, apiId, apiHash, {
-        connectionRetries: 5,
-    });
+            client = new TelegramClient(session, apiId, apiHash, {
+                connectionRetries: 5,
+            });
 
-    await client.connect();
-    return client;
+            await client.connect();
+            console.log("✅ [Loot] Telegram connected!");
+            return client;
+        } catch (e) {
+            console.error("[Loot] Telegram connection failed:", e);
+            connectionPromise = null;
+            return null;
+        }
+    })();
+
+    return connectionPromise;
 }
 
 export async function searchLootProducts(query: string): Promise<NormalizedProduct[]> {
@@ -47,7 +60,7 @@ export async function searchLootProducts(query: string): Promise<NormalizedProdu
         title: d.title,
         priceStr: d.price,
         productUrl: d.link,
-        source: `🔥 LOOT @${d.channel}`,
+        source: `🔥 LOOT`,
         thumbnail: undefined,
         productSpecs: d.timestamp ? [{ name: "Found", value: new Date(d.timestamp).toLocaleDateString() }] : undefined,
         coupon: d.coupon,
@@ -55,167 +68,226 @@ export async function searchLootProducts(query: string): Promise<NormalizedProdu
 }
 
 export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
-    const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+    const DEPTH_LIMIT_DAYS = 10;
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const now = Date.now();
-    const telegramClient = await getTelegramClient();
+    const TARGET_CUTOFF = now - (DEPTH_LIMIT_DAYS * MS_PER_DAY);
+    const MAX_MESSAGES_PER_CHANNEL = 300;
 
+    const telegramClient = await getTelegramClient();
     let allDeals: LootDeal[] = [];
 
     if (telegramClient) {
-        // Option A: Authenticated MTProto Scraping (Reliable)
-        for (const channelName of CHANNELS) {
+        const channelsToScrape = (query === "flight" || query === "hotel") ? ["desidime"] : CHANNELS;
+
+        for (const channelName of channelsToScrape) {
             try {
-                const messages = await telegramClient.getMessages(channelName, { limit: 20 }) as Api.Message[];
+                let channelDealsCount = 0;
+                let offsetId = 0;
+                console.log(`[Loot] Deep scraping @${channelName}...`);
 
-                for (const msg of messages) {
-                    if (!msg.message) continue;
+                let entity;
+                try {
+                    entity = await telegramClient.getEntity(channelName);
+                } catch (e) {
+                    try {
+                        entity = await telegramClient.getEntity(`@${channelName}`);
+                    } catch (e2) {
+                        console.error(`[Loot] Could not resolve entity for ${channelName}:`, e2);
+                        continue;
+                    }
+                }
 
-                    const timestamp = msg.date * 1000;
-                    if (now - timestamp > ONE_MONTH_MS) continue;
+                while (channelDealsCount < MAX_MESSAGES_PER_CHANNEL) {
+                    const messages = await telegramClient.getMessages(entity, {
+                        limit: 100,
+                        offsetId: offsetId > 0 ? offsetId : undefined
+                    }) as Api.Message[];
 
-                    const rawText = msg.message;
-                    const links = extractLinksFromText(rawText);
-                    if (links.length === 0) continue;
-
-                    const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                    const globalHeader = lines[0] || "";
-
-                    const segments = rawText.split(/(https?:\/\/[^\s]+)/g);
-                    let lastText = "";
-
-                    for (const segment of segments) {
-                        if (segment.startsWith('http')) {
-                            const affiliateLink = findBestAffiliateLink([segment]);
-                            if (!affiliateLink) continue;
-
-                            const context = lastText.trim();
-                            if (!context) continue;
-
-                            const contextLines = context.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                            const rawTitle = contextLines[contextLines.length - 1] || "";
-
-                            // 1. Smart Title: Combine global header if local title is too short/generic
-                            let title = rawTitle
-                                .replace(/[👉🔥✅🎯⚡️\[\]]|(?:Master\s*Link|Loot|Deal|Link)\s*[:\-]?/gi, '')
-                                .replace(/(?:at|@|for|now|only|Rs\.?|₹)\s*\d+(?:,\d+)*(?:\.\d{2})?\s*$/i, '') // Remove price from end of title
-                                .trim();
-
-                            if ((title.length < 8 || ["Sofa", "Bed", "Chair", "Table", "Loot"].some(kw => title.includes(kw))) && globalHeader.length > 5 && !globalHeader.includes("http")) {
-                                const cleanHeader = globalHeader.replace(/[👉🔥✅🎯⚡️\[\]]|(?:Master\s*Link|Loot|Deal|Link)\s*[:\-]?/gi, '').trim();
-                                if (title && !cleanHeader.includes(title)) {
-                                    title = `${cleanHeader.slice(0, 40)} - ${title}`;
-                                } else if (!title) {
-                                    title = cleanHeader || "Loot Deal";
-                                }
-                            }
-                            title = title.replace(/\s*[:\-]\s*$/, '').trim();
-
-                            // 2. Smart Price: Prioritize price after "at" or "@", ignore if preceded by "off" or "coupon"
-                            let price: string | undefined;
-                            const sellingPriceMatch = context.match(/(?:at|@|now|for|only)\s*(?:₹|Rs\.?)\s*(\d+(?:,\d+)*(?:\.\d{2})?)/i);
-                            if (sellingPriceMatch) {
-                                price = `₹${sellingPriceMatch[1]}`;
-                            } else {
-                                const allPrices = Array.from(context.matchAll(/(?:₹|Rs\.?)\s*(\d+(?:,\d+)*(?:\.\d{2})?)/gi));
-                                for (const m of allPrices) {
-                                    const index = m.index || 0;
-                                    const surrounding = context.slice(Math.max(0, index - 20), index).toLowerCase();
-                                    if (!surrounding.includes("off") && !surrounding.includes("coupon") && !surrounding.includes("save")) {
-                                        price = `₹${m[1]}`;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // 3. Coupon Detection
-                            const couponMatch = context.match(/(?:code|coupon|promocode|use code|apply code)[:\s-]*([A-Z0-9]{4,15})/i);
-                            const coupon = couponMatch ? couponMatch[1].toUpperCase() : undefined;
-
-                            // Skip junk results (e.g. just symbols or "Link :")
-                            if (title.toLowerCase().includes("disclosure") || title.length < 3) continue;
-
-                            allDeals.push({
-                                title: title.slice(0, 100),
-                                description: contextLines.slice(0, -1).join('\n').trim().slice(0, 150),
-                                price,
-                                coupon,
-                                link: affiliateLink,
-                                channel: channelName,
-                                timestamp: new Date(timestamp).toISOString(),
-                                isDirect: true
-                            });
-                        } else {
-                            lastText = segment;
+                    if (channelName === 'desidime') {
+                        console.log(`[Loot] Fetched ${messages.length} messages from @desidime`);
+                        if (messages.length > 0) {
+                            console.log(`[Loot] Sample msg: ${messages[0].message?.slice(0, 100)}`);
                         }
                     }
+
+                    if (messages.length === 0) break;
+
+                    let reachedCutoff = false;
+                    for (const msg of messages) {
+                        const timestamp = msg.date * 1000;
+                        if (timestamp < TARGET_CUTOFF) {
+                            reachedCutoff = true;
+                            break;
+                        }
+
+                        if (!msg.message) continue;
+                        const rawText = msg.message;
+                        const segments = rawText.split(/(https?:\/\/[^\s]+)/g);
+                        let lastText = "";
+                        const messageLinks: { url: string, label: string, context: string }[] = [];
+
+                        for (const segment of segments) {
+                            if (segment.startsWith('http')) {
+                                const label = lastText.split('\n').pop()?.trim().replace(/[:\-]$/, "").trim() || "";
+                                messageLinks.push({ url: segment, label, context: lastText });
+                            }
+                            lastText = segment;
+                        }
+
+                        if (messageLinks.length === 0) continue;
+
+                        const hasBuyNow = messageLinks.some(ml => ml.label.toLowerCase().includes("buy now") || ml.label.toLowerCase().includes("get deal"));
+                        const hasReadMore = messageLinks.some(ml => ml.label.toLowerCase().includes("read more"));
+
+                        if (hasBuyNow && hasReadMore && messageLinks.length <= 3) {
+                            const bestLinkObj = messageLinks.find(ml => ml.label.toLowerCase().includes("buy now") || ml.label.toLowerCase().includes("get deal")) || messageLinks[0];
+                            const affiliateLink = findBestAffiliateLink([bestLinkObj.url]);
+                            if (affiliateLink) {
+                                createAndPushDeal(rawText, affiliateLink, msg, allDeals, channelName, timestamp);
+                                channelDealsCount++;
+                            }
+                        } else {
+                            for (const ml of messageLinks) {
+                                const affiliateLink = findBestAffiliateLink([ml.url]);
+                                if (!affiliateLink) continue;
+                                createAndPushDeal(ml.context, affiliateLink, msg, allDeals, channelName, timestamp);
+                                channelDealsCount++;
+                            }
+                        }
+                    }
+
+                    if (reachedCutoff) break;
+                    offsetId = messages[messages.length - 1].id;
                 }
             } catch (e) {
                 console.error(`[Loot] Failed to fetch from Telegram channel ${channelName}:`, e);
             }
         }
     } else if (query && SERP_API_KEY) {
-        // Option B: Fallback to SerpAPI (Public Search)
         try {
             const siteQuery = `site:t.me/s/LootAlerts OR site:t.me/s/DesiDime OR site:t.me/s/gymdeals "${query}"`;
-            const params = new URLSearchParams({
-                engine: "google",
-                q: siteQuery,
-                tbs: "qdr:m",
-                api_key: SERP_API_KEY,
-            });
+            const params = new URLSearchParams({ engine: "google", q: siteQuery, tbs: "qdr:m", api_key: SERP_API_KEY });
             const res = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
             const data = await res.json();
-
             if (data.organic_results) {
                 allDeals = data.organic_results.map((r: any) => ({
                     title: r.title.replace(/Telegram: Contact @\w+\s*/i, '').trim(),
-                    description: r.snippet,
-                    link: r.link,
-                    channel: 'Search',
-                    isDirect: false
+                    description: r.snippet, link: r.link, channel: 'Search', isDirect: false
                 }));
             }
-        } catch (e) {
-            console.error("SerpAPI fallback failed:", e);
-        }
+        } catch (e) { console.error("SerpAPI fallback failed:", e); }
     }
 
-    // Common refinement: Sort and Filter by Query
-    allDeals = allDeals.sort((a, b) => {
-        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-        return timeB - timeA;
-    });
+    allDeals = allDeals.sort((a, b) => (new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()));
 
     if (query) {
         const q = query.toLowerCase();
-        return allDeals.filter(d =>
-            d.title.toLowerCase().includes(q) ||
-            (d.description && d.description.toLowerCase().includes(q))
-        ).slice(0, 10);
-    }
+        let keywords = [q];
+        if (q === "flight") keywords = ["flight", "airline", "airindia", "indigo", "akasa", "spicejet", "vistara", "airasia", "fly", "ticket", "boarding"];
+        if (q === "hotel") keywords = ["hotel", "stay", "resort", "oyo", "mmt", "makemytrip", "booking", "accommodation"];
 
-    return allDeals.slice(0, 10);
+        const filtered = allDeals.filter(d => {
+            const content = `${d.title} ${d.description || ""}`.toLowerCase();
+            return keywords.some(k => content.includes(k));
+        });
+        console.log(`[Loot] Query "${query}" matched ${filtered.length}/${allDeals.length} deals.`);
+        return filtered.slice(0, 30);
+    }
+    return allDeals.slice(0, 30);
 }
 
-function extractLinksFromText(text: string): string[] {
-    // Improved regex to avoid capturing trailing punctuation like . , ) !
-    const urlRegex = /https?:\/\/[^\s\)]+(?<![\.\,\!\?\)])/g;
-    return text.match(urlRegex) || [];
+function createAndPushDeal(context: string, affiliateLink: string, msg: Api.Message, allDeals: LootDeal[], channelName: string, timestamp: number) {
+    const cleanContext = context.replace(/https?:\/\/[^\s]+/g, '').trim();
+    const contextLines = cleanContext.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const globalHeader = (msg.message || "").split('\n')[0] || "";
+    let rawTitle = contextLines[contextLines.length - 1] || "";
+
+    const labelsToSkip = ["read more", "buy now", "get deal", "link", "click here", "grab", "loot", "deal"];
+    if (labelsToSkip.some(label => rawTitle.toLowerCase().includes(label)) || rawTitle.length < 4) {
+        for (let i = contextLines.length - 2; i >= 0; i--) {
+            const line = contextLines[i].toLowerCase();
+            if (contextLines[i].length > 5 && !labelsToSkip.some(label => line.includes(label))) {
+                rawTitle = contextLines[i];
+                break;
+            }
+        }
+    }
+
+    let title = rawTitle
+        .replace(/[👉🔥✅🎯⚡️\[\]]|(?:Master\s*Link|Loot|Deal|Link)\s*[:\-]?/gi, '')
+        .replace(/(?:at|@|for|now|only|Rs\.?|₹)\s*\d+(?:,\d+)*(?:\.\d{2})?\s*$/i, '')
+        .trim();
+
+    if ((title.length < 8 || ["Sofa", "Bed", "Chair", "Table", "Loot"].some(kw => title.includes(kw))) && globalHeader.length > 5 && !globalHeader.includes("http")) {
+        const cleanHeader = globalHeader.replace(/[👉🔥✅🎯⚡️\[\]]|(?:Master\s*Link|Loot|Deal|Link)\s*[:\-]?/gi, '').trim();
+        if (title && !cleanHeader.includes(title)) {
+            title = `${cleanHeader.slice(0, 40)} - ${title}`;
+        } else if (!title) {
+            title = cleanHeader || "Loot Deal";
+        }
+    }
+    title = title.replace(/\s*[:\-]\s*$/, '').trim();
+
+    let price: string | undefined;
+    const sellingPriceMatch = context.match(/(?:at|@|now|for|only)\s*(?:₹|Rs\.?)\s*(\d+(?:,\d+)*(?:\.\d{2})?)/i);
+    if (sellingPriceMatch) price = `₹${sellingPriceMatch[1]}`;
+    else {
+        const discountMatch = context.match(/(?:₹|Rs\.?)\s*(\d+(?:,\d+)*(?:\.\d{2})?)\s*(?:OFF|Discount|off|rupees off)/i);
+        if (discountMatch) price = `₹${discountMatch[1]} OFF`;
+        else {
+            const allPrices = Array.from(context.matchAll(/(?:₹|Rs\.?)\s*(\d+(?:,\d+)*(?:\.\d{2})?)/gi));
+            for (const m of allPrices) {
+                const index = m.index || 0;
+                const surrounding = context.slice(Math.max(0, index - 20), index).toLowerCase();
+                if (!surrounding.includes("coupon") && !surrounding.includes("save")) {
+                    price = `₹${m[1]}`;
+                    break;
+                }
+            }
+        }
+    }
+
+    const couponMatch = context.match(/(?:code|coupon|promocode|use code|apply code)[:\s-]*([A-Z0-9]{4,15})/i);
+    const coupon = couponMatch ? couponMatch[1].toUpperCase() : undefined;
+    if (title.toLowerCase().includes("disclosure") || title.length < 3) return;
+
+    let description = contextLines.slice(0, -1).join('\n').trim();
+    const specialMatch = context.match(/(\d+\s*rupees\s*off|holi\s*special|use\s*this\s*coupon|off)/i);
+    if (specialMatch) {
+        description += `\n\n📢 ${specialMatch[0].toUpperCase()}! Check this out with the link below.`;
+    }
+
+    allDeals.push({
+        title: title.slice(0, 100),
+        description: description.slice(0, 200),
+        price,
+        coupon,
+        link: affiliateLink,
+        channel: channelName,
+        timestamp: new Date(timestamp).toISOString(),
+        isDirect: true
+    });
 }
 
 function findBestAffiliateLink(links: string[]): string | null {
-    const trustedDomains = [
-        'amzn', 'amazon', 'fkrt', 'flipkart', 'bit.ly', 'ddime', 'shope.ee',
-        'myntra', 'ajio', 'tata-cliq', 'croma', 'reliance', 'cutt.ly',
-        'shorturl', 'tinyurl', 'clnk.in', 'fkrtt.it', 'wishlink', 'pelle'
-    ];
+    const retailers = ['amzn', 'amazon', 'fkrt', 'flipkart', 'myntra', 'ajio', 'tata-cliq', 'croma', 'reliance'];
+    const middlemen = ['bit.ly', 'shope.ee', 'cutt.ly', 'shorturl', 'tinyurl', 'clnk.in', 'fkrtt.it', 'wishlink', 'pelle', 'ddime.in'];
     const blacklistedDomains = ['groww', 'upstox', 'angelone', 'paytm', 'google.com/search', 't.me/'];
-
-    return links.find(l => {
+    let bestLink: string | null = null;
+    let highScore = -1;
+    for (const l of links) {
         const lower = l.toLowerCase();
-        const isTrusted = trustedDomains.some(d => lower.includes(d));
-        const isBlacklisted = blacklistedDomains.some(d => lower.includes(d));
-        return isTrusted && !isBlacklisted && !lower.includes('t.me');
-    }) || null;
+        if (blacklistedDomains.some(d => lower.includes(d))) continue;
+        let score = 0;
+        if (retailers.some(d => lower.includes(d))) score = 100;
+        else if (middlemen.some(d => lower.includes(d))) score = 50;
+        else score = 10;
+        if (score > highScore) { highScore = score; bestLink = l; }
+    }
+    return bestLink;
+}
+function extractLinksFromText(text: string): string[] {
+    const urlRegex = /https?:\/\/[^\s\)]+(?<![\.\,\!\?\)])/g;
+    return text.match(urlRegex) || [];
 }

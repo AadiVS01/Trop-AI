@@ -1,3 +1,5 @@
+import { fetchTrendingDeals, LootDeal } from "../deals/lootProvider";
+
 export interface FlightResult {
     airline: string;
     logo?: string;
@@ -7,6 +9,7 @@ export interface FlightResult {
     duration: string;
     price: string;
     link: string;
+    lootDeals?: LootDeal[];
 }
 
 export interface HotelResult {
@@ -17,6 +20,7 @@ export interface HotelResult {
     reviews?: number;
     thumbnail?: string;
     link: string;
+    lootDeals?: LootDeal[];
 }
 
 const SERP_API_KEY = process.env.SERP_API_KEY;
@@ -24,33 +28,29 @@ const SERP_API_KEY = process.env.SERP_API_KEY;
 export async function searchFlights(from: string, to: string, date: string, returnDate?: string): Promise<FlightResult[]> {
     if (!SERP_API_KEY) throw new Error("SERP_API_KEY not set");
 
-    const params = new URLSearchParams({
-        engine: "google_flights",
-        departure_id: from,
-        arrival_id: to,
-        outbound_date: date,
-        currency: "INR",
-        hl: "en",
-        gl: "in",
-        api_key: SERP_API_KEY,
-    });
+    // Parallel fetch: SERP flights + Telegram flight deals
+    const [serpRes, lootDeals] = await Promise.all([
+        fetch(`https://serpapi.com/search.json?${new URLSearchParams({
+            engine: "google_flights",
+            departure_id: from,
+            arrival_id: to,
+            outbound_date: date,
+            currency: "INR",
+            hl: "en",
+            gl: "in",
+            api_key: SERP_API_KEY,
+            type: returnDate ? "1" : "2"
+        }).toString()}`),
+        fetchTrendingDeals("flight")
+    ]);
 
-    if (returnDate) {
-        params.append("return_date", returnDate);
-        params.append("type", "1"); // Round trip
-    } else {
-        params.append("type", "2"); // One way
-    }
-    console.log(`✈️ Flight Search: ${from} -> ${to} on ${date} (Return: ${returnDate || 'N/A'})`);
-    const res = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
-    const data = await res.json();
-
-    // Mapping SerpAPI's google_flights structure - combine best and other flights
+    const data = await serpRes.json();
     const flightList = [
         ...(data.best_flights || []),
         ...(data.other_flights || [])
     ];
 
+    // Refine loot: look for specific airline or booking site mentioned in query or results
     const results: FlightResult[] = flightList.map((f: any) => ({
         airline: f.flights?.[0]?.airline || "Unknown",
         logo: f.flights?.[0]?.airline_logo,
@@ -60,13 +60,18 @@ export async function searchFlights(from: string, to: string, date: string, retu
             time: f.flights?.[0]?.departure_airport?.time,
         },
         arrival: {
-            airport: f.flights?.[f.flights.length - 1]?.arrival_airport?.name, // Last leg for connections
+            airport: f.flights?.[f.flights.length - 1]?.arrival_airport?.name,
             time: f.flights?.[f.flights.length - 1]?.arrival_airport?.time,
         },
         duration: `${Math.floor(f.total_duration / 60)}h ${f.total_duration % 60}m`,
         price: f.price ? `₹${f.price}` : "N/A",
         link: "https://www.google.com/travel/flights",
     }));
+
+    // Attach matching loots to the top result for maximum visibility
+    if (results.length > 0 && lootDeals.length > 0) {
+        results[0].lootDeals = lootDeals.slice(0, 2);
+    }
 
     return results.slice(0, 5);
 }
@@ -82,28 +87,21 @@ export async function searchHotels(location: string, checkIn: string, checkOut: 
         currency: "INR",
         hl: "en",
         gl: "in",
-        rating: "7", // Filter for 3.5+ stars (quality baseline)
+        rating: "7",
         api_key: SERP_API_KEY,
     };
 
-    if (maxPrice) {
-        params.max_price = maxPrice.toString();
-    } else {
-        params.sort_by = "8"; // If no price limit, prioritize highest rating
-    }
+    if (maxPrice) params.max_price = maxPrice.toString();
+    else params.sort_by = "8";
 
-    console.log(`🏨 Hotel Search: ${location} | ${checkIn} to ${checkOut || 'N/A'} | Budget: ${maxPrice || 'None'}`);
+    // Parallel fetch: Hotels + Telegram hotel deals
+    const [serpRes, lootDeals] = await Promise.all([
+        fetch(`https://serpapi.com/search.json?${new URLSearchParams(params).toString()}`),
+        fetchTrendingDeals("hotel")
+    ]);
 
-    const res = await fetch(`https://serpapi.com/search.json?${new URLSearchParams(params).toString()}`);
-    const data = await res.json();
-
-    if (data.properties && data.properties.length > 0) {
-        console.log(`✅ Found ${data.properties.length} hotels. First link preview: ${data.properties[0].link?.slice(0, 100)}...`);
-    } else {
-        console.log(`⚠️ No hotels found in raw SerpAPI response. Error: ${data.error || 'None'}`);
-    }
-
-    const results: HotelResult[] = (data.properties || []).map((h: any) => ({
+    const data = await serpRes.json();
+    const hotelResults: HotelResult[] = (data.properties || []).map((h: any) => ({
         name: h.name,
         description: h.description,
         price: h.total_rate?.lowest || h.rate_per_night?.lowest || "Contact for price",
@@ -113,5 +111,9 @@ export async function searchHotels(location: string, checkIn: string, checkOut: 
         link: h.link || `https://www.google.com/travel/hotels?q=${encodeURIComponent(h.name)}`,
     }));
 
-    return results.slice(0, 5);
+    if (hotelResults.length > 0 && lootDeals.length > 0) {
+        hotelResults[0].lootDeals = lootDeals.slice(0, 2);
+    }
+
+    return hotelResults.slice(0, 5);
 }
