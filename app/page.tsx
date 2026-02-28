@@ -3,15 +3,19 @@
 import { useState, useRef, useEffect } from "react";
 import { NormalizedProduct } from "@/lib/shopping/serpProvider";
 import { FlightResult, HotelResult } from "@/lib/travel/serpTravelProvider";
+import { LootDeal } from "@/lib/deals/lootProvider";
+
+
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type MessageItem =
   | { kind: "chat"; role: "user" | "assistant"; content: string }
   | { kind: "products"; query: string; products: NormalizedProduct[]; followUp?: string }
-  | { kind: "outfit"; template: any; stylistNote?: string; bundles: { category: string; products: NormalizedProduct[] }[] }
+  | { kind: "guide"; guide: any; bundles: { category: string; products: NormalizedProduct[] }[]; followUp?: string }
   | { kind: "flights"; flights: FlightResult[]; followUp?: string }
-  | { kind: "hotels"; hotels: HotelResult[]; followUp?: string };
+  | { kind: "hotels"; hotels: HotelResult[]; followUp?: string }
+  | { kind: "loot"; deals: LootDeal[]; query?: string; followUp?: string };
 
 type Mode = "landing" | "chat";
 
@@ -52,12 +56,14 @@ export default function ChatPage() {
 
       if (data.type === "products") {
         setItems([...newItems, { kind: "products", query: data.query, products: data.products, followUp: data.followUp }]);
-      } else if (data.type === "outfit") {
-        setItems([...newItems, { kind: "outfit", template: data.template, stylistNote: data.stylistNote, bundles: data.bundles }]);
+      } else if (data.type === "guide") {
+        setItems([...newItems, { kind: "guide", guide: data.guide, bundles: data.bundles, followUp: data.reply }]);
       } else if (data.type === "flights") {
         setItems([...newItems, { kind: "flights", flights: data.flights, followUp: data.followUp }]);
       } else if (data.type === "hotels") {
         setItems([...newItems, { kind: "hotels", hotels: data.hotels, followUp: data.followUp }]);
+      } else if (data.type === "loot") {
+        setItems([...newItems, { kind: "loot", deals: data.deals, query: data.query, followUp: data.followUp }]);
       } else {
         const reply = data.reply ?? "Something went wrong.";
         setItems([...newItems, { kind: "chat", role: "assistant", content: reply }]);
@@ -138,11 +144,11 @@ export default function ChatPage() {
                   </div>
                 );
               }
-              if (item.kind === "outfit") {
+              if (item.kind === "guide") {
                 return (
                   <div key={i} style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%" }}>
                     <div style={{ marginLeft: "1rem" }}>
-                      <strong style={{ display: "block", fontSize: "1.1rem", color: "#fff" }}>{item.template.name}</strong>
+                      <strong style={{ display: "block", fontSize: "1.1rem", color: "#fff" }}>{item.guide.name}</strong>
                     </div>
 
                     {item.bundles.map((bundle, bi) => (
@@ -155,14 +161,15 @@ export default function ChatPage() {
                     ))}
 
                     <div style={{ ...s.bubbleBot, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", marginTop: "-0.5rem" }}>
-                      <p style={{ fontSize: "0.85rem", opacity: 0.8, marginBottom: item.stylistNote ? "1rem" : 0 }}>{item.template.description}</p>
-                      {item.stylistNote && (
-                        <div style={{ padding: "0.75rem", background: "rgba(0,123,255,0.1)", borderLeft: "3px solid #007bff", borderRadius: "4px" }}>
-                          <strong style={{ display: "block", fontSize: "0.75rem", color: "#007bff", textTransform: "uppercase", marginBottom: "0.25rem" }}>Stylist's Tip</strong>
-                          <p style={{ fontSize: "0.85rem", color: "#eee", fontStyle: "italic" }}>"{item.stylistNote}"</p>
-                        </div>
-                      )}
+                      <p style={{ fontSize: "0.85rem", opacity: 0.8 }}>{item.guide.description}</p>
                     </div>
+
+                    {item.followUp && (
+                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
+                        <div style={s.avatar}>T</div>
+                        <div style={s.bubbleBot}>{item.followUp}</div>
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -183,6 +190,19 @@ export default function ChatPage() {
                 return (
                   <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     <HotelResults hotels={item.hotels} />
+                    {item.followUp && (
+                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
+                        <div style={s.avatar}>T</div>
+                        <div style={s.bubbleBot}>{item.followUp}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.kind === "loot") {
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <LootResults deals={item.deals} />
                     {item.followUp && (
                       <div style={{ ...s.row, justifyContent: "flex-start" }}>
                         <div style={s.avatar}>T</div>
@@ -227,14 +247,23 @@ export default function ChatPage() {
 }
 
 function ProductCard({ prod }: { prod: NormalizedProduct }) {
+  const isLoot = prod.source?.includes("LOOT");
   return (
     <a
       href={prod.productUrl ?? "#"}
       target="_blank"
       rel="noopener noreferrer"
-      style={{ ...p.card, textDecoration: "none" }}
+      style={{ ...p.card, textDecoration: "none", position: "relative" }}
     >
+      {isLoot && (
+        <div style={{ ...s.lootBadge, position: "absolute", top: "10px", right: "10px", zIndex: 1 }}>
+          LOOT
+        </div>
+      )}
       {prod.thumbnail && <img src={prod.thumbnail} alt={prod.title} style={p.img} />}
+      {!prod.thumbnail && isLoot && (
+        <div style={{ ...p.img, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem" }}>🔥</div>
+      )}
       <div style={p.info}>
         <span style={p.title}>{prod.title}</span>
         <div style={p.meta}>
@@ -245,8 +274,14 @@ function ProductCard({ prod }: { prod: NormalizedProduct }) {
           )}
         </div>
         {prod.source && <span style={p.source}>{prod.source}</span>}
+        {prod.coupon && (
+          <div style={s.couponDisplay}>
+            <span style={s.couponLabel}>CODE:</span>
+            <span style={s.couponCode}>{prod.coupon}</span>
+          </div>
+        )}
       </div>
-      <span style={p.chevron}>→</span>
+      {!isLoot && <span style={p.chevron}>→</span>}
     </a>
   );
 }
@@ -513,14 +548,105 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: "0.75rem",
     color: "#facc15",
   },
-  hotelDesc: {
-    fontSize: "0.75rem",
-    color: "#666",
-    lineHeight: 1.4,
-    height: "2.8rem",
+  lootCard: {
+    display: "flex",
+    gap: "0.75rem",
+    backgroundColor: "#1a1a1a",
+    border: "1px solid #2a2a2a",
+    borderRadius: "12px",
+    padding: "0.85rem",
+    textDecoration: "none",
+    cursor: "pointer",
+    transition: "border-color 0.15s",
+    position: "relative",
     overflow: "hidden",
   },
+  lootBadge: {
+    backgroundColor: "#ef4444",
+    color: "#fff",
+    fontSize: "0.65rem",
+    fontWeight: 800,
+    padding: "2px 8px",
+    borderRadius: "4px",
+    height: "fit-content",
+    flexShrink: 0,
+    marginTop: "2px",
+  },
+  lootPrice: {
+    color: "#4ade80",
+    fontWeight: 700,
+    fontSize: "0.9rem",
+  },
+  lootSource: {
+    color: "#de864a",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    backgroundColor: "rgba(222,134,74,0.1)",
+    padding: "1px 6px",
+    borderRadius: "4px",
+  },
+  couponDisplay: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.4rem",
+    marginTop: "0.25rem",
+    backgroundColor: "rgba(37, 99, 235, 0.1)",
+    border: "1px dashed rgba(37, 99, 235, 0.4)",
+    padding: "4px 8px",
+    borderRadius: "6px",
+    width: "fit-content",
+  },
+  couponLabel: {
+    fontSize: "0.65rem",
+    fontWeight: 600,
+    color: "#60a5fa",
+    letterSpacing: "0.02em",
+  },
+  couponCode: {
+    fontSize: "0.75rem",
+    fontWeight: 700,
+    color: "#fff",
+    fontFamily: "monospace",
+    letterSpacing: "0.05em",
+  },
 };
+
+function LootCard({ deal }: { deal: LootDeal }) {
+  return (
+    <a href={deal.link} target="_blank" style={s.lootCard}>
+      <div style={s.lootBadge}>LOOT</div>
+      <div style={p.info}>
+        <div style={p.title}>{deal.title}</div>
+        <div style={p.meta}>
+          {deal.price && <span style={s.lootPrice}>{deal.price}</span>}
+          <span style={s.lootSource}>via @{deal.channel}</span>
+        </div>
+        {deal.description && (
+          <p style={{ ...s.hotelDesc, height: "auto", WebkitLineClamp: 1, display: "-webkit-box", WebkitBoxOrient: "vertical", margin: 0 }}>
+            {deal.description}
+          </p>
+        )}
+        {deal.coupon && (
+          <div style={{ ...s.couponDisplay, marginTop: "0.5rem" }}>
+            <span style={s.couponLabel}>USE CODE:</span>
+            <span style={s.couponCode}>{deal.coupon}</span>
+          </div>
+        )}
+      </div>
+    </a>
+  );
+}
+
+function LootResults({ deals }: { deals: LootDeal[] }) {
+  if (!deals.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
+      {deals.map((d, i) => (
+        <LootCard key={i} deal={d} />
+      ))}
+    </div>
+  );
+}
 
 const p: Record<string, React.CSSProperties> = {
   wrap: {

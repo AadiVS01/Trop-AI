@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchProducts, NormalizedProduct } from "@/lib/shopping/serpProvider";
-import { findMatchingTemplates, OutfitTemplate, getBestLook } from "@/lib/style/styleService";
+import { findMatchingGuides, Guide } from "@/lib/guides/guideService";
 import { searchFlights, searchHotels, FlightResult, HotelResult } from "@/lib/travel/serpTravelProvider";
+import { fetchTrendingDeals, searchLootProducts, LootDeal } from "@/lib/deals/lootProvider";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type ResponsePayload =
     | { type: "chat"; reply: string }
     | { type: "products"; query: string; products: NormalizedProduct[]; followUp: string }
-    | { type: "outfit"; template: OutfitTemplate; stylistNote?: string; bundles: { category: string; products: NormalizedProduct[] }[] }
+    | { type: "guide"; guide: Guide; bundles: { category: string; products: NormalizedProduct[] }[] }
     | { type: "flights"; flights: FlightResult[]; followUp: string }
-    | { type: "hotels"; hotels: HotelResult[]; followUp: string };
+    | { type: "hotels"; hotels: HotelResult[]; followUp: string }
+    | { type: "loot"; deals: LootDeal[]; query?: string; followUp: string };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -68,11 +70,17 @@ Intents:
    Important: 
    - RETAIN "location", "check_in", "check_out" from context if not mentioned in the latest message.
    - Extract "max_price" if specified (e.g. "less than 2k" -> 2000).
-3. "outfit" — shopping/styling request.
-   Return: {"intent":"outfit", "gender":"male|female|unknown", "occasion":"wedding|party|formal|casual|everyday|unknown"}
+3. "guide" — user wants a collection, bundle, or step-by-step guide (furniture, supplements, outfits, etc.).
+   Return: {"intent":"guide", "category":"fashion|health|furniture|unknown", "query":"<specific interest or none>", "guideId":"<existing guide id from context|none>", "stepIndex":<number|null>}
+   Important: 
+   - If a guide is already active in context, return its "guideId" and the "stepIndex" the user is asking for (0-indexed).
+   - If the user says "what's next" or "next step", increment the stepIndex.
+   - If it's a new request, set stepIndex to 0.
 4. "search" — specific product search.
    Return: {"intent":"search", "query":"<query>"}
-5. "chat" — normal talk.
+5. "loot" — user wants trending deals, flash sales, or "loot".
+   Return: {"intent":"loot", "query":"<specific item query or none>"}
+6. "chat" — normal talk.
    Return: {"intent":"chat"}
 
 If info like destination or dates are missing for travel, return "clarify" with a question.
@@ -138,29 +146,75 @@ If info like destination or dates are missing for travel, return "clarify" with 
             });
         }
 
-        // Step 2c: Outfit Flow (Existing)
-        if (intent === "outfit") {
-            const { gender, occasion } = parsed;
-            if (gender === "unknown" && (occasion === "unknown" || !occasion)) {
-                const reply = await callGroq([{ role: "system", content: "Ask for gender/occasion for an outfit bundle." }, { role: "user", content: message }], 0.7);
-                return NextResponse.json({ type: "chat", reply });
+        // Step 2c: Guide Flow (Iterative)
+        if (intent === "guide") {
+            const { category, query, guideId, stepIndex } = parsed;
+            let guide: Guide | undefined;
+
+            if (guideId && guideId !== "none") {
+                guide = (await import("@/lib/guides/guideService")).getGuideById(guideId);
             }
-            const matches = findMatchingTemplates(gender, occasion);
-            const template = matches[0] || (await findMatchingTemplates(gender, "everyday"))[0];
-            const look = getBestLook(template);
-            if (look) {
-                const bundles = await Promise.all(look.items.map(async (item) => {
-                    const q = (gender && gender !== "unknown") ? `${gender} ${item.query}` : item.query;
-                    return { category: item.category, products: (await searchProducts(q)).slice(0, 5) };
-                }));
-                return NextResponse.json({ type: "outfit", template, stylistNote: look.stylistNote, bundles });
+
+            if (!guide) {
+                const matches = findMatchingGuides(query !== "none" ? query : message, category !== "unknown" ? category : undefined);
+                guide = matches[0];
+            }
+
+            if (guide) {
+                const index = typeof stepIndex === "number" ? stepIndex : 0;
+                const safeIndex = Math.min(Math.max(0, index), guide.steps.length - 1);
+                const step = guide.steps[safeIndex];
+
+                const bundle = {
+                    category: step.name,
+                    products: (await searchProducts(step.query)).slice(0, 5)
+                };
+
+                // The reply should be context-aware
+                const nextStep = guide.steps[safeIndex + 1];
+                const followUp = nextStep
+                    ? `That's the ${step.name}. Ready to look at the next step: ${nextStep.name}?`
+                    : `That's the final piece for your ${guide.name}! Need help with anything else?`;
+
+                return NextResponse.json({
+                    type: "guide",
+                    guide,
+                    bundles: [bundle],
+                    reply: followUp
+                });
             }
         }
 
-        // Step 2d: Search Flow
+        // Step 2d: Loot Flow
+        if (intent === "loot") {
+            const query = parsed.query && parsed.query !== "none" ? parsed.query : undefined;
+            const deals = await fetchTrendingDeals(query);
+            return NextResponse.json({
+                type: "loot",
+                deals,
+                query,
+                followUp: deals.length > 0
+                    ? "These are the hottest loot deals right now! Move fast, they usually expire in minutes. 🔥"
+                    : "I couldn't find any specific live loot for that right now. Checking these other trending deals instead..."
+            });
+        }
+
+        // Step 2e: Search Flow
         if (intent === "search" && parsed.query) {
-            const products = await searchProducts(parsed.query);
-            return NextResponse.json({ type: "products", query: parsed.query, products, followUp: "Found these! Want to refine further?" });
+            const [products, loots] = await Promise.all([
+                searchProducts(parsed.query),
+                searchLootProducts(parsed.query)
+            ]);
+            // Merge results: Loot deals first (if any), then regular results
+            const combined = [...loots, ...products].slice(0, 10);
+            return NextResponse.json({
+                type: "products",
+                query: parsed.query,
+                products: combined,
+                followUp: loots.length > 0
+                    ? "I found some exclusive flash deals for this! Look for the 🔥 LOOT badge."
+                    : "Found these! Want to refine further?"
+            });
         }
 
         // Step 2e: Clarify

@@ -1,0 +1,92 @@
+[
+    {
+        "id": "male-wedding-ethnic",
+        "name": "Traditional Wedding Ethnic",
+        "category": "fashion",
+        "gender": "male",
+        "occasion": "wedding",
+        "style": "ethnic",
+        "tags": [
+            "wedding",
+            "ethnic",
+            "formal",
+            "indian"
+        ],
+        "description": "Rich fabrics and festive colors for a grand Indian wedding.",
+        "steps": [
+            {
+                "name": "The Kurta Jacket Set",
+                "description": "A regal base with a matching jacket.",
+                "query": "Men's maroon kurta pajama with gold nehru jacket"
+            },
+            {
+                "name": "Traditional Footwear",
+                "description": "Complete the look with ethnic mojaris.",
+                "query": "Cream or gold men's mojaris"
+            },
+            {
+                "name": "Elegant Accessories",
+                "description": "A gold strap watch for a refined finish.",
+                "query": "Men's gold strap formal watch"
+            }
+        ]
+    },
+    {
+        "id": "beginner-gym-stack",
+        "name": "Beginner Gym Supplement Stack",
+        "category": "health",
+        "tags": [
+            "gym",
+            "fitness",
+            "supplements",
+            "beginner"
+        ],
+        "description": "Essential nutrients for anyone starting their fitness journey.",
+        "steps": [
+            {
+                "name": "Foundational Protein",
+                "description": "Start with Whey Protein for muscle recovery.",
+                "query": "Whey Protein Concentrate 1kg"
+            },
+            {
+                "name": "Performance & Strength",
+                "description": "Add Creatine Monohydrate for better output.",
+                "query": "Creatine Monohydrate micronized"
+            },
+            {
+                "name": "Recovery Support",
+                "description": "Support your body with multivitamins.",
+                "query": "Men's daily multivitamin tablets gym"
+            }
+        ]
+    },
+    {
+        "id": "living-room-starter",
+        "name": "Living Room Essentials",
+        "category": "furniture",
+        "tags": [
+            "home",
+            "furniture",
+            "living room",
+            "starter"
+        ],
+        "description": "The base pieces needed for a comfortable living space.",
+        "steps": [
+            {
+                "name": "The Anchor Piece (Sofa)",
+                "description": "Start with a comfortable, durable sofa.",
+                "query": "3 seater modern fabric sofa"
+            },
+            {
+                "name": "Functional Centerpiece",
+                "description": "Add a matching coffee table.",
+                "query": "Wooden coffee table with storage"
+            },
+            {
+                "name": "Comfort & Style",
+                "description": "Define the space with an area rug.",
+                "query": "Large geometric pattern area rug 5x8"
+            }
+        ]
+    }
+]

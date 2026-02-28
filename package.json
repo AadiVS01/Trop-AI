@@ -11,9 +11,11 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@pinecone-database/pinecone": "^7.1.0",
+    "input": "^1.0.1",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "telegram": "^2.26.22"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

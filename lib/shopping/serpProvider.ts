@@ -25,6 +25,7 @@ export interface NormalizedProduct {
     productId?: string;
     thumbnail?: string;
     source?: string;
+    coupon?: string;
 }
 
 export async function searchProducts(query: string): Promise<NormalizedProduct[]> {
