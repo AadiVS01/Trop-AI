@@ -182,19 +182,36 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
 
     allDeals = allDeals.sort((a, b) => (new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()));
 
+
     if (query) {
         const q = query.toLowerCase();
-        let keywords = [q];
-        if (q === "flight") keywords = ["flight", "airline", "airindia", "indigo", "akasa", "spicejet", "vistara", "airasia", "fly", "ticket", "boarding"];
-        if (q === "hotel") keywords = ["hotel", "stay", "resort", "oyo", "mmt", "makemytrip", "booking", "accommodation"];
-        if (q === "train") keywords = ["train", "irctc", "railway", "ixigo", "confirmtkt", "redbus", "seat"];
-        if (q === "bus") keywords = ["bus", "redbus", "abhibus", "zingbus", "travels", "st", "volvo"];
+        let keywords: string[] = [];
 
+        if (q === "flight") keywords = ["flight", "airline", "airindia", "indigo", "akasa", "spicejet", "vistara", "airasia", "fly", "ticket", "boarding"];
+        else if (q === "hotel") keywords = ["hotel", "stay", "resort", "oyo", "mmt", "makemytrip", "booking", "accommodation"];
+        else if (q === "train") keywords = ["train", "irctc", "railway", "ixigo", "confirmtkt", "redbus", "seat"];
+        else if (q === "bus") keywords = ["bus", "redbus", "abhibus", "zingbus", "travels", "st", "volvo"];
+        else {
+            // Tokenize query: remove small words and special chars
+            keywords = q.split(/\s+/)
+                .map(k => k.replace(/[^\w]/g, '').trim())
+                .filter(k => k.length > 2); // only words with > 2 chars
+
+            // If query was very short (e.g. "hp"), keep it
+            if (keywords.length === 0 && q.trim().length > 0) keywords = [q.trim().toLowerCase()];
+        }
+
+        const isTravelQuery = ["flight", "hotel", "train", "bus"].includes(q);
         const filtered = allDeals.filter(d => {
             const content = `${d.title} ${d.description || ""}`.toLowerCase();
-            return keywords.some(k => content.includes(k));
+            if (isTravelQuery) {
+                return keywords.some(k => content.includes(k));
+            } else {
+                return keywords.every(k => content.includes(k));
+            }
         });
-        console.log(`[Loot] Query "${query}" matched ${filtered.length}/${allDeals.length} deals.`);
+
+        console.log(`[Loot] Query "${query}" (keywords: ${keywords.join(',')}) matched ${filtered.length}/${allDeals.length} deals.`);
         return filtered.slice(0, 30);
     }
     return allDeals.slice(0, 30);
