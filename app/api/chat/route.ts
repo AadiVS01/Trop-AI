@@ -61,39 +61,27 @@ If the user asks about ANYTHING else (e.g., general knowledge, cooking, sports, 
 
 Given context and message, return JSON ONLY.
 
-Intents:
-1. "flight" — user wants to book or find a flight. 
-   Return: {"intent":"flight", "from":"<3-letter IATA code>", "to":"<3-letter IATA code>", "date":"YYYY-MM-DD", "return_date":"YYYY-MM-DD|none"}
-   Important: 
-   - ALWAYS resolve city/state names to their primary 3-letter IATA airport codes (e.g. Pune: PNQ, Kerala: COK, Delhi: DEL, Mumbai: BOM).
-   - Resolve partial dates (e.g. "12", "15th") based on Today: Feb 28, 2026. If the user says "12", they mean 2026-03-12.
-   - RETAIN "from" and "to" from context if not mentioned in the latest message.
-2. "hotel" — user wants to book or find a hotel.
-   Return: {"intent":"hotel", "location":"<city>", "check_in":"YYYY-MM-DD", "check_out":"YYYY-MM-DD", "max_price":<number|null>}
-   Important: 
-   - RETAIN "location", "check_in", "check_out" from context if not mentioned in the latest message.
-   - Extract "max_price" if specified (e.g. "less than 2k" -> 2000).
-3. "train" — user wants to book or find a train.
-   Return: {"intent":"train", "from":"<station name/city>", "to":"<station name/city>", "date":"YYYY-MM-DD"}
-4. "bus" — user wants to book or find a bus.
-   Return: {"intent":"bus", "from":"<city>", "to":"<city>", "date":"YYYY-MM-DD"}
-5. "travel_generic" — user says they want to travel or plan a trip but doesn't specify if it's a flight, train, or bus.
-   Return: {"intent":"travel_generic"}
-6. "guide" — user wants a collection, bundle, or step-by-step guide (furniture, supplements, outfits, etc.).
-   Return: {"intent":"guide", "category":"fashion|health|furniture|unknown", "query":"<specific interest or none>", "guideId":"<existing guide id from context|none>", "stepIndex":<number|null>}
-   Important: 
-   - If a guide is already active in context, return its "guideId" and the "stepIndex" the user is asking for (0-indexed).
-   - If the user says "what's next" or "next step", increment the stepIndex.
-   - If it's a new request, set stepIndex to 0.
-4. "search" — specific product search.
-   Return: {"intent":"search", "query":"<query>"}
-5. "loot" — user wants trending deals, flash sales, or "loot".
-   Return: {"intent":"loot", "query":"<specific item query or none>"}
-6. "chat" — normal talk.
-   Return: {"intent":"chat"}
+Rules:
+- If use says "i want to travel" or "plan a trip" WITHOUT mentioning Flight, Train, or Bus, use "travel_generic".
+- If user HAS mentioned a mode (e.g. "book a flight"), you MUST use that specific intent (e.g. "flight"), NOT "travel_generic".
+- Do NOT trigger "loot" or "search" for simple acknowledgments like "ok", "yes", "sure", "thanks", "fine". These should be "chat".
+- Only use "loot" or "search" if it's a NEW request for products.
 
-If info like destination or dates are missing for travel, return "clarify" with a question.
-6. "clarify" — {"intent":"clarify", "reply":"<friendly question asking for missing dates/cities>"}`,
+Intents:
+1. "flight" — user wants a flight. Even if cities/dates are missing, use this. Returns: {"intent":"flight", "from":"<IATA|unknown>", "to":"<IATA|unknown>", "date":"YYYY-MM-DD|unknown", "return_date":"YYYY-MM-DD|none"}
+   - Resolve city/state to 3-letter IATA airport codes (Pune: PNQ, Delhi: DEL, Mumbai: BOM).
+   - Resolve partial dates based on Today: Feb 28, 2026.
+2. "hotel" — {"intent":"hotel", "location":"<city|unknown>", "check_in":"YYYY-MM-DD|unknown", "check_out":"YYYY-MM-DD|unknown", "max_price":<number|null>}
+   - Extract destination and dates.
+3. "train" — {"intent":"train", "from":"<station/city|unknown>", "to":"<station/city|unknown>", "date":"YYYY-MM-DD|unknown"}
+4. "bus" — {"intent":"bus", "from":"<city|unknown>", "to":"<city|unknown>", "date":"YYYY-MM-DD|unknown"}
+5. "travel_generic" — user wants a trip/holiday but has NOT mentioned if it's a Flight, Train, or Bus.
+6. "guide" — {"intent":"guide", "category":"fashion|health|furniture|unknown", "query":"<query>", "guideId":"<id|none>", "stepIndex":<number|null>}
+7. "search" — {"intent":"search", "query":"<query>"}
+8. "loot" — {"intent":"loot", "query":"<query|none>"}
+9. "chat" — greetings, polite talk, or simple acknowledgments ("ok", "got it").
+10. "out_of_scope" — anything not shopping or travel.
+11. "clarify" — {"intent":"clarify", "reply":"<question for missing info>"}`,
             },
             ...(contextSummary ? [{ role: "user", content: `Recent context:\n${contextSummary}` }] : []),
             { role: "user", content: message },

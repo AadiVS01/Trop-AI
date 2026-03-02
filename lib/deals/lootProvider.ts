@@ -187,10 +187,10 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
         const q = query.toLowerCase();
         let keywords: string[] = [];
 
-        if (q === "flight") keywords = ["flight", "airline", "airindia", "indigo", "akasa", "spicejet", "vistara", "airasia", "fly", "ticket", "boarding"];
-        else if (q === "hotel") keywords = ["hotel", "stay", "resort", "oyo", "mmt", "makemytrip", "booking", "accommodation"];
-        else if (q === "train") keywords = ["train", "irctc", "railway", "ixigo", "confirmtkt", "redbus", "seat"];
-        else if (q === "bus") keywords = ["bus", "redbus", "abhibus", "zingbus", "travels", "st", "volvo"];
+        if (q === "flight") keywords = ["flight", "airline", "airindia", "indigo", "akasa", "spicejet", "vistara", "airasia", "boarding"];
+        else if (q === "hotel") keywords = ["hotel", "resort", "oyo", "mmt", "makemytrip", "booking", "accommodation"];
+        else if (q === "train") keywords = ["train", "irctc", "railway", "ixigo", "confirmtkt"];
+        else if (q === "bus") keywords = ["bus", "redbus", "abhibus", "zingbus", "volvo"];
         else {
             // Tokenize query: remove small words and special chars
             keywords = q.split(/\s+/)
