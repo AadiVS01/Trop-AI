@@ -56,6 +56,9 @@ export async function POST(req: NextRequest) {
             {
                 role: "system",
                 content: `You are a travel and shopping intent classifier for an Indian assistant (TROP).
+TROP is EXCLUSIVELY for shopping (products, deals, loot) and travel booking (flights, hotels, trains, buses).
+If the user asks about ANYTHING else (e.g., general knowledge, cooking, sports, science, life advice, or "what is an apple"), you MUST return the "out_of_scope" intent.
+
 Given context and message, return JSON ONLY.
 
 Intents:
@@ -265,8 +268,24 @@ If info like destination or dates are missing for travel, return "clarify" with 
             return NextResponse.json({ type: "chat", reply: parsed.reply });
         }
 
-        // Step 2f: Regular chat
-        const reply = await callGroq([...history, { role: "user", content: message }], 0.8);
+        // Step 2f: Out of scope
+        if (intent === "out_of_scope") {
+            return NextResponse.json({
+                type: "chat",
+                reply: "I'm TROP, your dedicated AI assistant for **Shopping** and **Trip Booking**! 🛍️✈️ I can help you find deals, book flights, hotels, trains, or buses, and find the best products. I don't have information on other topics yet. How can I help you with your next purchase or journey? 😊"
+            });
+        }
+
+        // Step 2g: Regular chat
+        const restrictedHistory = [
+            {
+                role: "system",
+                content: "You are TROP, an AI assistant specialized ONLY in shopping and travel booking. Politely decline any questions outside these two domains. Always steer the conversation back to shopping or travel planning."
+            },
+            ...history,
+            { role: "user", content: message }
+        ];
+        const reply = await callGroq(restrictedHistory, 0.8);
         return NextResponse.json({ type: "chat", reply });
 
     } catch (e: any) {
