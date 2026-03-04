@@ -20,6 +20,7 @@ export interface HotelResult {
     reviews?: number;
     thumbnail?: string;
     link: string;
+    source?: string;
     lootDeals?: LootDeal[];
 }
 
@@ -142,6 +143,7 @@ export async function searchHotels(location: string, checkIn: string, checkOut: 
         reviews: h.reviews,
         thumbnail: h.images?.[0]?.thumbnail,
         link: h.link || `https://www.google.com/travel/hotels?q=${encodeURIComponent(h.name)}`,
+        source: "Google Hotels",
     }));
 
     if (hotelResults.length > 0 && lootDeals.length > 0) {

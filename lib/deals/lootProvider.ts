@@ -21,6 +21,10 @@ const SERP_API_KEY = process.env.SERP_API_KEY;
 let client: TelegramClient | null = null;
 let connectionPromise: Promise<TelegramClient | null> | null = null;
 
+// Simple in-memory cache for loot deals
+const lootCache: { [key: string]: { deals: LootDeal[], timestamp: number } } = {};
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 async function getTelegramClient() {
     if (client) return client;
     if (connectionPromise) return connectionPromise;
@@ -68,6 +72,12 @@ export async function searchLootProducts(query: string): Promise<NormalizedProdu
 }
 
 export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
+    const cacheKey = query || "all";
+    if (lootCache[cacheKey] && (Date.now() - lootCache[cacheKey].timestamp) < CACHE_TTL) {
+        console.log(`[Loot] Returning cached deals for: ${cacheKey}`);
+        return lootCache[cacheKey].deals;
+    }
+
     const DEPTH_LIMIT_DAYS = 10;
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const now = Date.now();
@@ -212,9 +222,13 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
         });
 
         console.log(`[Loot] Query "${query}" (keywords: ${keywords.join(',')}) matched ${filtered.length}/${allDeals.length} deals.`);
-        return filtered.slice(0, 30);
+        const results = filtered.slice(0, 30);
+        lootCache[cacheKey] = { deals: results, timestamp: Date.now() };
+        return results;
     }
-    return allDeals.slice(0, 30);
+    const finalDeals = allDeals.slice(0, 30);
+    lootCache[cacheKey] = { deals: finalDeals, timestamp: Date.now() };
+    return finalDeals;
 }
 
 function createAndPushDeal(context: string, affiliateLink: string, msg: Api.Message, allDeals: LootDeal[], channelName: string, timestamp: number) {

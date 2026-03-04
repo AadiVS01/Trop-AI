@@ -15,6 +15,8 @@ type MessageItem =
   | { kind: "guide"; guide: any; bundles: { category: string; products: NormalizedProduct[] }[]; followUp?: string }
   | { kind: "flights"; flights: FlightResult[]; followUp?: string }
   | { kind: "hotels"; hotels: HotelResult[]; followUp?: string }
+  | { kind: "trains"; trains: any[]; followUp?: string }
+  | { kind: "buses"; buses: any[]; followUp?: string }
   | { kind: "loot"; deals: LootDeal[]; query?: string; followUp?: string };
 
 type Mode = "landing" | "chat";
@@ -62,8 +64,10 @@ export default function ChatPage() {
         setItems([...newItems, { kind: "flights", flights: data.flights, followUp: data.followUp }]);
       } else if (data.type === "hotels") {
         setItems([...newItems, { kind: "hotels", hotels: data.hotels, followUp: data.followUp }]);
-      } else if (data.type === "loot") {
-        setItems([...newItems, { kind: "loot", deals: data.deals, query: data.query, followUp: data.followUp }]);
+      } else if (data.type === "trains") {
+        setItems([...newItems, { kind: "trains", trains: data.trains, followUp: data.followUp }]);
+      } else if (data.type === "buses") {
+        setItems([...newItems, { kind: "buses", buses: data.hotels, followUp: data.followUp }]);
       } else {
         const reply = data.reply ?? "Something went wrong.";
         setItems([...newItems, { kind: "chat", role: "assistant", content: reply }]);
@@ -190,6 +194,32 @@ export default function ChatPage() {
                 return (
                   <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     <HotelResults hotels={item.hotels} />
+                    {item.followUp && (
+                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
+                        <div style={s.avatar}>T</div>
+                        <div style={s.bubbleBot}>{item.followUp}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.kind === "trains") {
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <TrainResults trains={item.trains} />
+                    {item.followUp && (
+                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
+                        <div style={s.avatar}>T</div>
+                        <div style={s.bubbleBot}>{item.followUp}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.kind === "buses") {
+                return (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <BusResults buses={item.buses} />
                     {item.followUp && (
                       <div style={{ ...s.row, justifyContent: "flex-start" }}>
                         <div style={s.avatar}>T</div>
@@ -371,6 +401,117 @@ function HotelResults({ hotels }: { hotels: HotelResult[] }) {
             </div>
           </a>
           {h.lootDeals && h.lootDeals.map((loot, li) => (
+            <a key={li} href={loot.link} target="_blank" style={s.travelLoot}>
+              <span style={s.travelLootTag}>🔥 FEATURED LOOT</span>
+              <span style={{ fontSize: "0.75rem", color: "#4ade80", fontWeight: 700 }}>{loot.price ? `${loot.price} Discount` : "Special Deal"}</span>
+              {loot.coupon && <span style={{ fontSize: "0.7rem", color: "#60a5fa", fontWeight: 600 }}>CODE: {loot.coupon}</span>}
+              <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loot.title}</span>
+            </a>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrainResults({ trains }: { trains: any[] }) {
+  if (!trains.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
+      {trains.map((t, i) => (
+        <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          <div style={{ ...s.travelCard, borderColor: "rgba(59, 130, 246, 0.4)", background: "rgba(30, 41, 59, 0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "1.2rem" }}>🚂</span>
+                <div>
+                  <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#fff" }}>{t.trainName}</div>
+                  <div style={{ fontSize: "0.7rem", color: "#60a5fa", fontWeight: 600 }}>#{t.trainNumber}</div>
+                </div>
+              </div>
+              <a href={t.link} target="_blank" style={{ ...s.sendBtn, width: "auto", padding: "0 1rem", fontSize: "0.75rem", fontWeight: 700, textDecoration: "none" }}>BOOK ON IXIGO</a>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem", alignItems: "center" }}>
+              <div style={s.timeBlock}>
+                <span style={s.time}>{t.departure.time}</span>
+                <span style={s.airport}>{t.departure.airport}</span>
+              </div>
+              <div style={s.durationLine}>
+                <div style={{ ...s.line, background: "rgba(96, 165, 250, 0.3)" }} />
+                <span style={{ ...s.durationText, color: "#94a3b8" }}>{t.duration}</span>
+                <div style={{ ...s.line, background: "rgba(96, 165, 250, 0.3)" }} />
+              </div>
+              <div style={s.timeBlock} className="text-right">
+                <span style={s.time}>{t.arrival.time}</span>
+                <span style={s.airport}>{t.arrival.airport}</span>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "0.5rem", marginTop: "1.25rem" }}>
+              {t.classAvailability?.map((avail: any, ai: number) => {
+                const isAvailable = avail.displayStatus.includes("AVL") || avail.displayStatus.includes("Available");
+                const isRegret = avail.displayStatus.toLowerCase().includes("regret");
+                const color = isAvailable ? "#4ade80" : isRegret ? "#ef4444" : "#facc15";
+
+                return (
+                  <div key={ai} style={{
+                    padding: "0.75rem",
+                    borderRadius: "8px",
+                    background: "rgba(255,255,255,0.03)",
+                    border: `1px solid ${color}33`,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.25rem"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#fff" }}>{avail.class}</span>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#4ade80" }}>₹{avail.fare}</span>
+                    </div>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 600, color }}>{avail.displayStatus}</div>
+                    {avail.prediction && (
+                      <div style={{ fontSize: "0.65rem", color: "#888", fontStyle: "italic" }}>
+                        {avail.prediction} {avail.predictionPercent ? `(${avail.predictionPercent}%)` : ""}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {t.lootDeals && t.lootDeals.map((loot: any, li: number) => (
+            <a key={li} href={loot.link} target="_blank" style={s.travelLoot}>
+              <span style={s.travelLootTag}>🔥 FEATURED LOOT</span>
+              <span style={{ fontSize: "0.75rem", color: "#4ade80", fontWeight: 700 }}>{loot.price ? `${loot.price} Discount` : "Special Deal"}</span>
+              {loot.coupon && <span style={{ fontSize: "0.7rem", color: "#60a5fa", fontWeight: 600 }}>CODE: {loot.coupon}</span>}
+              <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loot.title}</span>
+            </a>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BusResults({ buses }: { buses: any[] }) {
+  if (!buses.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
+      {buses.map((b, i) => (
+        <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+          <a href={b.link} target="_blank" style={{ ...s.travelCard, textDecoration: "none", borderColor: "rgba(16, 185, 129, 0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "1.2rem" }}>🚌</span>
+                <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>{b.name || "Bus Service"}</span>
+              </div>
+              <span style={s.travelPrice}>{b.price}</span>
+            </div>
+            <div style={{ marginTop: "0.5rem" }}>
+              <p style={{ fontSize: "0.8rem", color: "#888" }}>{b.description}</p>
+            </div>
+          </a>
+          {b.lootDeals && b.lootDeals.map((loot: any, li: number) => (
             <a key={li} href={loot.link} target="_blank" style={s.travelLoot}>
               <span style={s.travelLootTag}>🔥 FEATURED LOOT</span>
               <span style={{ fontSize: "0.75rem", color: "#4ade80", fontWeight: 700 }}>{loot.price ? `${loot.price} Discount` : "Special Deal"}</span>
