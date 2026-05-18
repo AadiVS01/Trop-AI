@@ -1,0 +1,38 @@
+[
+  {
+    "modelName": "llama-3.1-8b-instant",
+    "jsonValidityRate": 100,
+    "domainAccuracy": 100,
+    "fieldAccuracy": 81.07142857142856,
+    "exactMatchRate": 0,
+    "consistencyScore": 1,
+    "avgLatency": 2631.7
+  },
+  {
+    "modelName": "llama-3.3-70b-versatile",
+    "jsonValidityRate": 100,
+    "domainAccuracy": 100,
+    "fieldAccuracy": 86.07142857142856,
+    "exactMatchRate": 40,
+    "consistencyScore": 0.9,
+    "avgLatency": 1127.5
+  },
+  {
+    "modelName": "qwen/qwen3-32b",
+    "jsonValidityRate": 90,
+    "domainAccuracy": 90,
+    "fieldAccuracy": 76.60714285714285,
+    "exactMatchRate": 20,
+    "consistencyScore": 0.8,
+    "avgLatency": 4245.4
+  },
+  {
+    "modelName": "openai/gpt-oss-20b",
+    "jsonValidityRate": 100,
+    "domainAccuracy": 100,
+    "fieldAccuracy": 80.89285714285714,
+    "exactMatchRate": 10,
+    "consistencyScore": 1,
+    "avgLatency": 1374.6
+  }
+]
