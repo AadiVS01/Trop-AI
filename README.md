@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TROP
 
-## Getting Started
+AI assistant for the Indian market focused on shopping, deals, and travel bookings (flights, hotels, trains, buses). The app routes user intent, fetches live results, and presents them in a unified chat UI. A separate eval harness tests constraint extraction prompts across multiple models.
 
-First, run the development server:
+## What it does
+
+- Shopping search with Google Shopping (SerpAPI) and Amazon (RapidAPI)
+- Live travel lookups for flights, hotels (Google + Agoda), trains (IRCTC), and buses
+- Loot deals pulled from Telegram channels with a SerpAPI fallback
+- Intent classification and routing via Groq
+- Evaluation harness for constraint extraction prompts
+
+## Structure
+
+- app/: Next.js UI and API routes
+- lib/: data providers (shopping, travel, deals) and chat handlers
+- scripts/: Telegram auth utilities
+- eval-harness/: prompt evaluation runner and datasets
+
+## Quick start
+
+1) Install dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2) Create .env in the repo root
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+GROQ_API_KEY=your_groq_key
+SERP_API_KEY=your_serpapi_key
+RAPIDAPI_KEY=your_rapidapi_key
+RAPIDAPI_HOST=your_rapidapi_amazon_host
+RAPIDAPI_HOST_AGODA=your_rapidapi_agoda_host
+RAPIDAPI_HOST_IRCTC=your_rapidapi_irctc_host
+TELEGRAM_API_ID=123456
+TELEGRAM_API_HASH=your_telegram_hash
+TELEGRAM_SESSION=your_telegram_session
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3) Run the app
 
-## Learn More
+```bash
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open http://localhost:3000
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Required for core features:
 
-## Deploy on Vercel
+- GROQ_API_KEY: Groq API for intent classification and chat
+- SERP_API_KEY: SerpAPI for Google Shopping, Hotels, Flights, and fallback loot search
+- RAPIDAPI_KEY: RapidAPI key for Amazon, Agoda, and IRCTC
+- RAPIDAPI_HOST: RapidAPI host for Amazon product APIs
+- RAPIDAPI_HOST_AGODA: RapidAPI host for Agoda hotel APIs
+- RAPIDAPI_HOST_IRCTC: RapidAPI host for IRCTC train availability
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Optional (enables richer loot search via Telegram):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- TELEGRAM_API_ID
+- TELEGRAM_API_HASH
+- TELEGRAM_SESSION
+
+If Telegram variables are missing, loot search falls back to SerpAPI web search.
+
+## Telegram session setup (optional)
+
+Run the helper to generate a session string:
+
+```bash
+pnpm tsx scripts/telegram-auth.ts
+```
+
+Copy the printed session string into TELEGRAM_SESSION in .env.
+
+## API routes
+
+- POST /api/chat: main chat entry point, intent classification, and routing
+- GET /api/resolve?id=...: resolve product sellers from SerpAPI
+
+## Eval harness
+
+The eval harness compares Stage 1 (zero-shot) and Stage 2 (few-shot) prompts on a dataset.
+
+```bash
+cd eval-harness
+pnpm install
+pnpm start
+```
+
+Results are saved as JSON in the eval-harness working directory.
+
+## Development notes
+
+- UI lives in app/page.tsx
+- Providers live in lib/shopping, lib/travel, lib/deals
+- The classifier prompt and routing logic live in app/api/chat/route.ts
