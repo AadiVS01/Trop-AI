@@ -69,19 +69,6 @@ export async function handleTrain(parsed: any) {
     });
 }
 
-export async function handleBus(parsed: any) {
-    const { from, to, date } = parsed;
-    if (!from || !to || !date || from === "unknown" || to === "unknown") {
-        return NextResponse.json({ type: "chat", reply: "Tell me where you want to go by bus and when! 🚌" });
-    }
-    const { searchBuses } = await import("@/lib/travel/serpTravelProvider");
-    const buses = await searchBuses(from, to, date);
-    return NextResponse.json({
-        type: "hotels",
-        hotels: buses,
-        followUp: "Here are the best bus options and trending loots! 🚌✨"
-    });
-}
 
 export async function handleSearch(parsed: any) {
     const query = parsed.query;

@@ -16,7 +16,6 @@ type MessageItem =
   | { kind: "flights"; flights: FlightResult[]; followUp?: string }
   | { kind: "hotels"; hotels: HotelResult[]; followUp?: string }
   | { kind: "trains"; trains: any[]; followUp?: string }
-  | { kind: "buses"; buses: any[]; followUp?: string }
   | { kind: "loot"; deals: LootDeal[]; query?: string; followUp?: string };
 
 type Mode = "landing" | "chat";
@@ -66,8 +65,6 @@ export default function ChatPage() {
         setItems([...newItems, { kind: "hotels", hotels: data.hotels, followUp: data.followUp }]);
       } else if (data.type === "trains") {
         setItems([...newItems, { kind: "trains", trains: data.trains, followUp: data.followUp }]);
-      } else if (data.type === "buses") {
-        setItems([...newItems, { kind: "buses", buses: data.hotels, followUp: data.followUp }]);
       } else {
         const reply = data.reply ?? "Something went wrong.";
         setItems([...newItems, { kind: "chat", role: "assistant", content: reply }]);
@@ -207,19 +204,6 @@ export default function ChatPage() {
                 return (
                   <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     <TrainResults trains={item.trains} />
-                    {item.followUp && (
-                      <div style={{ ...s.row, justifyContent: "flex-start" }}>
-                        <div style={s.avatar}>T</div>
-                        <div style={s.bubbleBot}>{item.followUp}</div>
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-              if (item.kind === "buses") {
-                return (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    <BusResults buses={item.buses} />
                     {item.followUp && (
                       <div style={{ ...s.row, justifyContent: "flex-start" }}>
                         <div style={s.avatar}>T</div>
@@ -493,37 +477,6 @@ function TrainResults({ trains }: { trains: any[] }) {
   );
 }
 
-function BusResults({ buses }: { buses: any[] }) {
-  if (!buses.length) return null;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
-      {buses.map((b, i) => (
-        <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <a href={b.link} target="_blank" style={{ ...s.travelCard, textDecoration: "none", borderColor: "rgba(16, 185, 129, 0.3)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                <span style={{ fontSize: "1.2rem" }}>🚌</span>
-                <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>{b.name || "Bus Service"}</span>
-              </div>
-              <span style={s.travelPrice}>{b.price}</span>
-            </div>
-            <div style={{ marginTop: "0.5rem" }}>
-              <p style={{ fontSize: "0.8rem", color: "#888" }}>{b.description}</p>
-            </div>
-          </a>
-          {b.lootDeals && b.lootDeals.map((loot: any, li: number) => (
-            <a key={li} href={loot.link} target="_blank" style={s.travelLoot}>
-              <span style={s.travelLootTag}>🔥 FEATURED LOOT</span>
-              <span style={{ fontSize: "0.75rem", color: "#4ade80", fontWeight: 700 }}>{loot.price ? `${loot.price} Discount` : "Special Deal"}</span>
-              {loot.coupon && <span style={{ fontSize: "0.7rem", color: "#60a5fa", fontWeight: 600 }}>CODE: {loot.coupon}</span>}
-              <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loot.title}</span>
-            </a>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 
 const s: Record<string, React.CSSProperties> = {

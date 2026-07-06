@@ -48,13 +48,13 @@ export async function POST(req: NextRequest) {
             {
                 role: "system",
                 content: `You are a travel and shopping intent classifier for an Indian assistant (TROP).
-TROP is EXCLUSIVELY for shopping (products, deals, loot) and travel booking (flights, hotels, trains, buses).
+TROP is EXCLUSIVELY for shopping (products, deals, loot) and travel booking (flights, hotels, trains).
 If the user asks about ANYTHING else (e.g., general knowledge, cooking, sports, science, life advice, or "what is an apple"), you MUST return the "out_of_scope" intent.
 
 Given context and message, return JSON ONLY.
 
 Rules:
-- If use says "i want to travel" or "plan a trip" WITHOUT mentioning Flight, Train, or Bus, use "travel_generic".
+- If use says "i want to travel" or "plan a trip" WITHOUT mentioning Flight or Train, use "travel_generic".
 - If user HAS mentioned a mode (e.g. "book a flight"), you MUST use that specific intent (e.g. "flight"), NOT "travel_generic".
 - Do NOT trigger "loot" or "search" for simple acknowledgments like "ok", "yes", "sure", "thanks", "fine". These should be "chat".
 - Only use "loot" or "search" if it's a NEW request for products.
@@ -66,14 +66,13 @@ Intents:
 2. "hotel" — {"intent":"hotel", "location":"<city|unknown>", "check_in":"YYYY-MM-DD|unknown", "check_out":"YYYY-MM-DD|unknown", "max_price":<number|null>}
    - Extract destination and dates.
 3. "train" — {"intent":"train", "from":"<station/city|unknown>", "to":"<station/city|unknown>", "date":"YYYY-MM-DD|unknown"}
-4. "bus" — {"intent":"bus", "from":"<city|unknown>", "to":"<city|unknown>", "date":"YYYY-MM-DD|unknown"}
-5. "travel_generic" — user wants a trip/holiday but has NOT mentioned if it's a Flight, Train, or Bus.
+4. "travel_generic" — user wants a trip/holiday but has NOT mentioned if it's a Flight or Train.
 6. "guide" — {"intent":"guide", "category":"fashion|health|furniture|unknown", "query":"<query>", "guideId":"<id|none>", "stepIndex":<number|null>}
 7. "search" — {"intent":"search", "query":"<query>"}
 8. "loot" — {"intent":"loot", "query":"<query|none>"}
 9. "chat" — greetings, polite talk, or simple acknowledgments ("ok", "got it").
-10. "out_of_scope" — anything not shopping or travel.
-11. "clarify" — {"intent":"clarify", "reply":"<question for missing info>"}`,
+9. "out_of_scope" — anything not shopping or travel.
+10. "clarify" — {"intent":"clarify", "reply":"<question for missing info>"}`,
             },
             ...(contextSummary ? [{ role: "user", content: `Recent context:\n${contextSummary}` }] : []),
             { role: "user", content: message },
@@ -94,7 +93,7 @@ Intents:
             case "travel_generic":
                 return NextResponse.json({
                     type: "chat",
-                    reply: "I'd love to help you plan your trip! 🌍 Where are we going? And would you like me to find you a **Flight**, **Train**, or **Bus**? ✈️🚂🚌"
+                    reply: "I'd love to help you plan your trip! 🌍 Where are we going? And would you like me to find you a **Flight** or **Train**? ✈️🚂"
                 });
             case "flight":
                 return handlers.handleFlight(parsed);
@@ -102,8 +101,6 @@ Intents:
                 return handlers.handleHotel(parsed);
             case "train":
                 return handlers.handleTrain(parsed);
-            case "bus":
-                return handlers.handleBus(parsed);
             case "guide":
                 return handlers.handleGuide(parsed, message);
             case "loot":

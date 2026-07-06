@@ -95,20 +95,6 @@ export async function searchTrains(from: string, to: string, date: string): Prom
     return results;
 }
 
-export async function searchBuses(from: string, to: string, date: string): Promise<HotelResult[]> {
-    const lootDeals = await fetchTrendingDeals("bus");
-
-    // For buses, we point to RedBus/AbhiBus
-    const results: HotelResult[] = [{
-        name: "Bus Services",
-        description: `Buses from ${from} to ${to}`,
-        price: "From ₹499",
-        link: `https://www.redbus.in/bus-tickets/${from.toLowerCase()}-to-${to.toLowerCase()}?onwardpostDate=${date}`,
-        lootDeals: lootDeals.slice(0, 3)
-    }];
-
-    return results;
-}
 
 export async function searchHotels(location: string, checkIn: string, checkOut: string, maxPrice?: number): Promise<HotelResult[]> {
     if (!SERP_API_KEY) throw new Error("SERP_API_KEY not set");
