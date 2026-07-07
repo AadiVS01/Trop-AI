@@ -6,19 +6,35 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-async function callGroq(messages: object[], temperature = 0.3): Promise<string> {
+async function callGroq(messages: object[], model = "llama-3.1-8b-instant", temperature = 0.3): Promise<string> {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error("GROQ_API_KEY not set");
 
     const res = await fetch(GROQ_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages, temperature }),
+        body: JSON.stringify({ model, messages, temperature }),
     });
 
     if (!res.ok) throw new Error(`Groq error: ${res.status}`);
     const data = await res.json();
     return data?.choices?.[0]?.message?.content ?? "";
+}
+
+function countConstraints(parsed: any): number {
+    if (!parsed || typeof parsed !== "object") return 0;
+    let count = 0;
+    
+    // Ignore intent and other metadata/clarification keys
+    const ignoreKeys = new Set(["intent", "reply", "guideId", "stepIndex"]);
+    
+    for (const [key, value] of Object.entries(parsed)) {
+        if (ignoreKeys.has(key)) continue;
+        if (value !== null && value !== undefined && value !== "unknown" && value !== "none" && value !== "") {
+            count++;
+        }
+    }
+    return count;
 }
 
 function buildContextSummary(history: ChatMessage[]): string {
@@ -78,12 +94,29 @@ Intents:
             { role: "user", content: message },
         ];
 
-        const classifyRaw = await callGroq(classifyMessages, 0.0);
+        // Step 1: Classify intent and extract variables using the cheap model first
+        let modelUsed = "llama-3.1-8b-instant";
+        let classifyRaw = await callGroq(classifyMessages, modelUsed, 0.0);
         let parsed: any = {};
         try {
             parsed = JSON.parse(classifyRaw.replace(/```json|```/g, "").trim());
         } catch {
             parsed = { intent: "chat" };
+        }
+
+        const constraintCount = countConstraints(parsed);
+        console.log(`[Hybrid Routing] Cheap model (${modelUsed}) extracted ${constraintCount} constraints.`);
+
+        // Step 2: Escalate to the expert model if it's a complex query (> 3 constraints)
+        if (constraintCount > 3) {
+            modelUsed = "llama-3.3-70b-versatile";
+            console.log(`[Hybrid Routing] Escalating to expert model (${modelUsed}) for complex query.`);
+            classifyRaw = await callGroq(classifyMessages, modelUsed, 0.0);
+            try {
+                parsed = JSON.parse(classifyRaw.replace(/```json|```/g, "").trim());
+            } catch {
+                parsed = { intent: "chat" };
+            }
         }
 
         const intent = parsed.intent || "chat";
@@ -123,7 +156,7 @@ Intents:
                     ...history,
                     { role: "user", content: message }
                 ];
-                const reply = await callGroq(restrictedHistory, 0.8);
+                const reply = await callGroq(restrictedHistory, "llama-3.3-70b-versatile", 0.8);
                 return NextResponse.json({ type: "chat", reply });
         }
     } catch (e: any) {
