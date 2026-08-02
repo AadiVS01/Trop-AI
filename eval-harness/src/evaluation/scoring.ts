@@ -11,7 +11,7 @@ export interface ScoringResult {
 }
 
 export function scoreOutput(output: string, expected: ExtractionResult): ScoringResult {
-    let parsed: any;
+    let parsed: unknown;
     try {
         parsed = JSON.parse(output);
     } catch (e) {
@@ -33,7 +33,7 @@ export function scoreOutput(output: string, expected: ExtractionResult): Scoring
             fieldAccuracy: 0,
             isExactMatch: false,
             parsedOutput: null,
-            validationErrors: validation.error.issues.map((err: any) => `${err.path.join('.')}: ${err.message}`),
+            validationErrors: validation.error.issues.map((err) => `${err.path.join('.')}: ${err.message}`),
         };
     }
 

@@ -24,6 +24,31 @@ export interface HotelResult {
     lootDeals?: LootDeal[];
 }
 
+interface SerpFlightSegment {
+    airline?: string;
+    airline_logo?: string;
+    flight_number?: string;
+    departure_airport?: { name?: string; time?: string };
+    arrival_airport?: { name?: string; time?: string };
+}
+
+interface SerpFlightRaw {
+    flights?: SerpFlightSegment[];
+    total_duration?: number;
+    price?: number;
+}
+
+interface SerpHotelRaw {
+    name: string;
+    description?: string;
+    total_rate?: { lowest?: string };
+    rate_per_night?: { lowest?: string };
+    overall_rating?: number;
+    reviews?: number;
+    images?: Array<{ thumbnail?: string }>;
+    link?: string;
+}
+
 const SERP_API_KEY = process.env.SERP_API_KEY;
 
 export async function searchFlights(from: string, to: string, date: string, returnDate?: string): Promise<FlightResult[]> {
@@ -46,25 +71,25 @@ export async function searchFlights(from: string, to: string, date: string, retu
     ]);
 
     const data = await serpRes.json();
-    const flightList = [
+    const flightList: SerpFlightRaw[] = [
         ...(data.best_flights || []),
         ...(data.other_flights || [])
     ];
 
     // Refine loot: look for specific airline or booking site mentioned in query or results
-    const results: FlightResult[] = flightList.map((f: any) => ({
+    const results: FlightResult[] = flightList.map((f) => ({
         airline: f.flights?.[0]?.airline || "Unknown",
         logo: f.flights?.[0]?.airline_logo,
-        flight_number: f.flights?.[0]?.flight_number,
+        flight_number: f.flights?.[0]?.flight_number || "",
         departure: {
-            airport: f.flights?.[0]?.departure_airport?.name,
-            time: f.flights?.[0]?.departure_airport?.time,
+            airport: f.flights?.[0]?.departure_airport?.name || "",
+            time: f.flights?.[0]?.departure_airport?.time || "",
         },
         arrival: {
-            airport: f.flights?.[f.flights.length - 1]?.arrival_airport?.name,
-            time: f.flights?.[f.flights.length - 1]?.arrival_airport?.time,
+            airport: f.flights?.[f.flights.length - 1]?.arrival_airport?.name || "",
+            time: f.flights?.[f.flights.length - 1]?.arrival_airport?.time || "",
         },
-        duration: `${Math.floor(f.total_duration / 60)}h ${f.total_duration % 60}m`,
+        duration: f.total_duration ? `${Math.floor(f.total_duration / 60)}h ${f.total_duration % 60}m` : "N/A",
         price: f.price ? `₹${f.price}` : "N/A",
         link: "https://www.google.com/travel/flights",
     }));
@@ -96,20 +121,20 @@ export async function searchTrains(from: string, to: string, date: string): Prom
 }
 
 
-export async function searchHotels(location: string, checkIn: string, checkOut: string, maxPrice?: number): Promise<HotelResult[]> {
+export async function searchHotels(location: string, checkIn: string, checkOut?: string, maxPrice?: number): Promise<HotelResult[]> {
     if (!SERP_API_KEY) throw new Error("SERP_API_KEY not set");
 
-    const params: any = {
+    const params: Record<string, string> = {
         engine: "google_hotels",
         q: `hotels in ${location}`,
         check_in_date: checkIn,
-        check_out_date: checkOut,
         currency: "INR",
         hl: "en",
         gl: "in",
         rating: "7",
         api_key: SERP_API_KEY,
     };
+    if (checkOut) params.check_out_date = checkOut;
 
     if (maxPrice) params.max_price = maxPrice.toString();
     else params.sort_by = "8";
@@ -121,7 +146,8 @@ export async function searchHotels(location: string, checkIn: string, checkOut: 
     ]);
 
     const data = await serpRes.json();
-    const hotelResults: HotelResult[] = (data.properties || []).map((h: any) => ({
+    const rawProperties: SerpHotelRaw[] = data.properties || [];
+    const hotelResults: HotelResult[] = rawProperties.map((h) => ({
         name: h.name,
         description: h.description,
         price: h.total_rate?.lowest || h.rate_per_night?.lowest || "Contact for price",

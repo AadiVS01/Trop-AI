@@ -36,17 +36,18 @@ async function main() {
             throw new Error("Invalid invite link format");
         }
 
-        const result = await client.invoke(
+        await client.invoke(
             new Api.messages.ImportChatInvite({
                 hash: hash,
             })
         );
         console.log("✅ Successfully joined the channel!");
-    } catch (err: any) {
-        if (err.errorMessage === 'USER_ALREADY_PARTICIPANT') {
+    } catch (err: unknown) {
+        const telegramErr = err as { errorMessage?: string };
+        if (telegramErr.errorMessage === 'USER_ALREADY_PARTICIPANT') {
             console.log("✅ You are already a participant of this channel.");
         } else {
-            console.error("❌ Failed to join:", err.errorMessage || err);
+            console.error("❌ Failed to join:", telegramErr.errorMessage || err);
         }
     }
 

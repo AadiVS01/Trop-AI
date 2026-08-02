@@ -1,4 +1,5 @@
-import { FlightResult } from "./serpTravelProvider";
+import learnedStationsData from "./learned_stations.json";
+import groupedStationsData from "./stations.json";
 
 export interface TrainClassAvailability {
     class: string;
@@ -19,6 +20,24 @@ export interface TrainResult {
     price: string;
     link: string;
     source: string;
+}
+
+interface StationEntry {
+    name: string;
+    code: string;
+}
+
+interface IRCTCTrainRaw {
+    trainNumber?: string;
+    train_number?: string;
+    trainName?: string;
+    train_name?: string;
+    departure?: string;
+    arrival?: string;
+    from?: { code?: string };
+    to?: { code?: string };
+    duration?: string;
+    classAvailability?: TrainClassAvailability[];
 }
 
 export async function searchTrains(from: string, to: string, date: string): Promise<TrainResult[]> {
@@ -58,12 +77,12 @@ export async function searchTrains(from: string, to: string, date: string): Prom
 
         if (res.ok) {
             const json = await res.json();
-            const trains = json.data || json.results || [];
+            const trains: IRCTCTrainRaw[] = json.data || json.results || [];
             console.log(`[TrainSearch] Found ${trains.length} trains via IRCTC API.`);
 
-            return trains.map((t: any) => ({
-                trainNumber: t.trainNumber || t.train_number,
-                trainName: t.trainName || t.train_name,
+            return trains.map((t) => ({
+                trainNumber: t.trainNumber || t.train_number || "",
+                trainName: t.trainName || t.train_name || "",
                 departure: { time: t.departure || "Check", airport: t.from?.code || sourceCode },
                 arrival: { time: t.arrival || "Check", airport: t.to?.code || destCode },
                 duration: t.duration || "Variable",
@@ -88,13 +107,11 @@ async function getStationCode(query: string): Promise<string | null> {
         const normalizedQuery = query.toUpperCase().trim();
 
         // Tier 0: Check Learned Mappings (Memory)
-        try {
-            const learned = require("./learned_stations.json");
-            if (learned[normalizedQuery]) {
-                console.log(`[StationCode] Found learned mapping: ${normalizedQuery} -> ${learned[normalizedQuery]}`);
-                return learned[normalizedQuery];
-            }
-        } catch (e) { /* Ignore missing file */ }
+        const learned = learnedStationsData as Record<string, string>;
+        if (learned[normalizedQuery]) {
+            console.log(`[StationCode] Found learned mapping: ${normalizedQuery} -> ${learned[normalizedQuery]}`);
+            return learned[normalizedQuery];
+        }
 
         // Tier 1: Extract code from parentheses if present (e.g. "Ernakulam (ERS)")
         const codeMatch = normalizedQuery.match(/\(([^)]+)\)/);
@@ -104,13 +121,13 @@ async function getStationCode(query: string): Promise<string | null> {
             return extractedCode;
         }
 
-        const groupedStations = require("./stations.json");
+        const groupedStations = groupedStationsData as Record<string, StationEntry[]>;
 
         // Tier 2: State-level matching (Suggesting primary hub for the state)
         if (groupedStations[normalizedQuery]) {
             const stateStations = groupedStations[normalizedQuery];
             // Find "primary" station (usually JUNCTION or biggest name)
-            const primary = stateStations.find((s: any) => s.name.includes(" JN")) || stateStations[0];
+            const primary = stateStations.find((s) => s.name.includes(" JN")) || stateStations[0];
             console.log(`[StationCode] Query matches state "${normalizedQuery}". Suggesting primary hub: ${primary.name} (${primary.code})`);
             return primary.code;
         }
@@ -120,18 +137,18 @@ async function getStationCode(query: string): Promise<string | null> {
             const stations = groupedStations[state];
 
             // Check for exact code match
-            const codeOnlyMatch = stations.find((s: any) => s.code === normalizedQuery);
+            const codeOnlyMatch = stations.find((s) => s.code === normalizedQuery);
             if (codeOnlyMatch) return codeOnlyMatch.code;
 
             // Check for exact name match (normalized)
-            const exactNameMatch = stations.find((s: any) =>
+            const exactNameMatch = stations.find((s) =>
                 s.name === normalizedQuery ||
                 s.name.replace(/ JN\.?| TOWN| CITY/g, "").trim() === normalizedQuery
             );
             if (exactNameMatch) return exactNameMatch.code;
 
             // Fuzzy/Substring matching
-            const fuzzyMatch = stations.find((s: any) => {
+            const fuzzyMatch = stations.find((s) => {
                 const cleanName = s.name.replace(/ JN\.?| TOWN| CITY/g, "").trim();
                 return cleanName.includes(normalizedQuery) ||
                     normalizedQuery.includes(cleanName) ||
@@ -146,8 +163,8 @@ async function getStationCode(query: string): Promise<string | null> {
 
         console.warn(`[StationCode] No local match found for "${query}"`);
         return null;
-    } catch (e) {
-        console.error("[StationCode] Error resolving station:", e);
+    } catch (err) {
+        console.error("[StationCode] Error resolving station:", err);
         return null;
     }
 }

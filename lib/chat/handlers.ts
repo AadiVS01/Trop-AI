@@ -1,11 +1,46 @@
 import { NextResponse } from "next/server";
-import { searchProducts, NormalizedProduct } from "@/lib/shopping/serpProvider";
+import { searchProducts } from "@/lib/shopping/serpProvider";
 import { searchAmazonProducts } from "@/lib/shopping/amazonProvider";
-import { searchFlights, searchHotels, FlightResult, HotelResult } from "@/lib/travel/serpTravelProvider";
-import { fetchTrendingDeals, searchLootProducts, LootDeal } from "@/lib/deals/lootProvider";
+import { searchFlights, searchHotels } from "@/lib/travel/serpTravelProvider";
+import { fetchTrendingDeals, searchLootProducts } from "@/lib/deals/lootProvider";
 import { findMatchingGuides, Guide, getGuideById } from "@/lib/guides/guideService";
 
-export async function handleFlight(parsed: any) {
+export interface ParsedFlightIntent {
+    from?: string;
+    to?: string;
+    date?: string;
+    return_date?: string;
+}
+
+export interface ParsedHotelIntent {
+    location?: string;
+    check_in?: string;
+    check_out?: string;
+    max_price?: number;
+}
+
+export interface ParsedTrainIntent {
+    from?: string;
+    to?: string;
+    date?: string;
+}
+
+export interface ParsedSearchIntent {
+    query: string;
+}
+
+export interface ParsedLootIntent {
+    query?: string;
+}
+
+export interface ParsedGuideIntent {
+    category?: string;
+    query?: string;
+    guideId?: string;
+    stepIndex?: number;
+}
+
+export async function handleFlight(parsed: ParsedFlightIntent) {
     const { from, to, date, return_date } = parsed;
     if (!from || !to || !date || from === "unknown" || to === "unknown") {
         return NextResponse.json({ type: "chat", reply: "I'd love to help you find a flight! Where are you flying from and where to? (and what dates?) ✈️" });
@@ -18,15 +53,17 @@ export async function handleFlight(parsed: any) {
     });
 }
 
-export async function handleHotel(parsed: any) {
-    let { location, check_in, check_out, max_price } = parsed;
-    if (check_in && check_in !== "unknown" && (!check_out || check_out === "unknown")) {
+export async function handleHotel(parsed: ParsedHotelIntent) {
+    const { location, check_in, max_price } = parsed;
+    let computedCheckOut = parsed.check_out;
+
+    if (check_in && check_in !== "unknown" && (!computedCheckOut || computedCheckOut === "unknown")) {
         try {
             const d = new Date(check_in);
             d.setDate(d.getDate() + 1);
-            check_out = d.toISOString().split('T')[0];
+            computedCheckOut = d.toISOString().split('T')[0];
         } catch {
-            check_out = undefined;
+            computedCheckOut = undefined;
         }
     }
     if (!location || location === "unknown") {
@@ -38,8 +75,8 @@ export async function handleHotel(parsed: any) {
     const { searchAgodaHotels } = await import("@/lib/travel/agodaProvider");
 
     const [googleHotels, agodaHotels] = await Promise.all([
-        searchHotels(location, check_in, check_out, max_price),
-        searchAgodaHotels(location, check_in, check_out)
+        searchHotels(location, check_in, computedCheckOut, max_price),
+        searchAgodaHotels(location, check_in, computedCheckOut)
     ]);
 
     const combined = [...agodaHotels, ...googleHotels].slice(0, 10);
@@ -53,7 +90,7 @@ export async function handleHotel(parsed: any) {
     });
 }
 
-export async function handleTrain(parsed: any) {
+export async function handleTrain(parsed: ParsedTrainIntent) {
     const { from, to, date } = parsed;
     if (!from || !to || !date || from === "unknown" || to === "unknown") {
         return NextResponse.json({ type: "chat", reply: "I can help with train bookings! Just let me know the stations and the date. 🚂" });
@@ -69,8 +106,7 @@ export async function handleTrain(parsed: any) {
     });
 }
 
-
-export async function handleSearch(parsed: any) {
+export async function handleSearch(parsed: ParsedSearchIntent) {
     const query = parsed.query;
     const [amazonProducts, serpProducts, loots] = await Promise.all([
         searchAmazonProducts(query),
@@ -91,7 +127,7 @@ export async function handleSearch(parsed: any) {
     });
 }
 
-export async function handleLoot(parsed: any) {
+export async function handleLoot(parsed: ParsedLootIntent) {
     const query = parsed.query && parsed.query !== "none" ? parsed.query : undefined;
     const deals = await fetchTrendingDeals(query);
     return NextResponse.json({
@@ -104,7 +140,7 @@ export async function handleLoot(parsed: any) {
     });
 }
 
-export async function handleGuide(parsed: any, message: string) {
+export async function handleGuide(parsed: ParsedGuideIntent, message: string) {
     const { category, query, guideId, stepIndex } = parsed;
     let guide: Guide | undefined;
 
@@ -113,7 +149,7 @@ export async function handleGuide(parsed: any, message: string) {
     }
 
     if (!guide) {
-        const matches = findMatchingGuides(query !== "none" ? query : message, category !== "unknown" ? category : undefined);
+        const matches = findMatchingGuides(query !== "none" ? (query || message) : message, category !== "unknown" ? category : undefined);
         guide = matches[0];
     }
 

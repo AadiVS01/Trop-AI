@@ -21,7 +21,7 @@ async function callGroq(messages: object[], model = "llama-3.1-8b-instant", temp
     return data?.choices?.[0]?.message?.content ?? "";
 }
 
-function countConstraints(parsed: any): number {
+function countConstraints(parsed: Record<string, unknown>): number {
     if (!parsed || typeof parsed !== "object") return 0;
     let count = 0;
     
@@ -97,7 +97,7 @@ Intents:
         // Step 1: Classify intent and extract variables using the cheap model first
         let modelUsed = "llama-3.1-8b-instant";
         let classifyRaw = await callGroq(classifyMessages, modelUsed, 0.0);
-        let parsed: any = {};
+        let parsed: Record<string, unknown> = {};
         try {
             parsed = JSON.parse(classifyRaw.replace(/```json|```/g, "").trim());
         } catch {
@@ -119,7 +119,7 @@ Intents:
             }
         }
 
-        const intent = parsed.intent || "chat";
+        const intent = (parsed.intent as string) || "chat";
 
         // Route to specialized handlers
         switch (intent) {
@@ -129,17 +129,17 @@ Intents:
                     reply: "I'd love to help you plan your trip! 🌍 Where are we going? And would you like me to find you a **Flight** or **Train**? ✈️🚂"
                 });
             case "flight":
-                return handlers.handleFlight(parsed);
+                return handlers.handleFlight(parsed as handlers.ParsedFlightIntent);
             case "hotel":
-                return handlers.handleHotel(parsed);
+                return handlers.handleHotel(parsed as handlers.ParsedHotelIntent);
             case "train":
-                return handlers.handleTrain(parsed);
+                return handlers.handleTrain(parsed as handlers.ParsedTrainIntent);
             case "guide":
-                return handlers.handleGuide(parsed, message);
+                return handlers.handleGuide(parsed as handlers.ParsedGuideIntent, message);
             case "loot":
-                return handlers.handleLoot(parsed);
+                return handlers.handleLoot(parsed as handlers.ParsedLootIntent);
             case "search":
-                return handlers.handleSearch(parsed);
+                return handlers.handleSearch(parsed as unknown as handlers.ParsedSearchIntent);
             case "clarify":
                 return NextResponse.json({ type: "chat", reply: parsed.reply });
             case "out_of_scope":
@@ -159,8 +159,9 @@ Intents:
                 const reply = await callGroq(restrictedHistory, "llama-3.3-70b-versatile", 0.8);
                 return NextResponse.json({ type: "chat", reply });
         }
-    } catch (e: any) {
-        console.error("API Error:", e);
-        return NextResponse.json({ error: "Internal Server Error", details: e.message }, { status: 500 });
+    } catch (e: unknown) {
+        const err = e as Error;
+        console.error("API Error:", err);
+        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
     }
 }

@@ -1,10 +1,8 @@
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
-// @ts-ignore
+// @ts-expect-error input package lacks type declarations
 import input from "input";
 import * as dotenv from "dotenv";
-import * as fs from "fs";
-import * as path from "path";
 
 dotenv.config();
 

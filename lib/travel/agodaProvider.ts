@@ -18,7 +18,22 @@ export interface AgodaHotel {
     reviewCount: number;
 }
 
-export async function searchAgodaHotels(location: string, checkIn: string, checkOut: string): Promise<HotelResult[]> {
+interface AgodaCityItem {
+    cityId?: number;
+    cityName?: string;
+}
+
+interface AgodaRawHotel {
+    hotelId: number;
+    hotelName: string;
+    starRating: number;
+    price: number;
+    reviewRating: number;
+    reviewCount: number;
+    imageUrl: string;
+}
+
+export async function searchAgodaHotels(location: string, checkIn: string, checkOut?: string): Promise<HotelResult[]> {
     const apiKey = process.env.RAPIDAPI_KEY;
     const host = process.env.RAPIDAPI_HOST_AGODA;
 
@@ -38,7 +53,7 @@ export async function searchAgodaHotels(location: string, checkIn: string, check
 
         if (!autoRes.ok) throw new Error(`Agoda Autocomplete error: ${autoRes.status}`);
         const autoData = await autoRes.json();
-        const city = autoData.data?.find((item: any) => item.cityId !== undefined);
+        const city = autoData.data?.find((item: AgodaCityItem) => item.cityId !== undefined);
 
         if (!city?.cityId) {
             console.warn(`Could not find Agoda city ID for: ${location}`);
@@ -46,15 +61,16 @@ export async function searchAgodaHotels(location: string, checkIn: string, check
         }
 
         // Step 2: Search Hotels with City ID
-        const searchParams = new URLSearchParams({
+        const paramsObj: Record<string, string> = {
             cityId: city.cityId.toString(),
             checkIn: checkIn,
-            checkOut: checkOut,
             adults: "2",
             rooms: "1",
             pageNumber: "1",
             pageSize: "10",
-        });
+        };
+        if (checkOut) paramsObj.checkOut = checkOut;
+        const searchParams = new URLSearchParams(paramsObj);
 
         const searchRes = await fetch(`https://${host}/hotels/search?${searchParams}`, {
             method: "GET",
@@ -66,7 +82,7 @@ export async function searchAgodaHotels(location: string, checkIn: string, check
 
         if (!searchRes.ok) throw new Error(`Agoda Search error: ${searchRes.status}`);
         const searchData = await searchRes.json();
-        const rawHotels: any[] = searchData.data?.hotels || [];
+        const rawHotels: AgodaRawHotel[] = searchData.data?.hotels || [];
 
         return rawHotels.map((h) => ({
             name: h.hotelName,

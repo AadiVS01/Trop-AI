@@ -1,4 +1,4 @@
-import { searchProducts, NormalizedProduct } from "../shopping/serpProvider";
+import { NormalizedProduct } from "../shopping/serpProvider";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { Api } from "telegram";
@@ -17,44 +17,59 @@ export interface LootDeal {
 import CHANNELS from "./channels.json";
 const SERP_API_KEY = process.env.SERP_API_KEY;
 
-// Persistence for the Telegram client
-let client: TelegramClient | null = null;
-let connectionPromise: Promise<TelegramClient | null> | null = null;
+// Declare global augmentation to persist single Telegram client across Next.js HMR reloads
+declare global {
+    var _telegramClient: TelegramClient | null | undefined;
+    var _telegramConnPromise: Promise<TelegramClient | null> | null | undefined;
+}
 
 // Simple in-memory cache for loot deals
 const lootCache: { [key: string]: { deals: LootDeal[], timestamp: number } } = {};
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 async function getTelegramClient() {
-    if (client) return client;
-    if (connectionPromise) return connectionPromise;
+    if (globalThis._telegramClient && globalThis._telegramClient.connected) {
+        return globalThis._telegramClient;
+    }
+    if (globalThis._telegramConnPromise) return globalThis._telegramConnPromise;
 
-    connectionPromise = (async () => {
+    globalThis._telegramConnPromise = (async () => {
         try {
             const apiId = parseInt(process.env.TELEGRAM_API_ID || "");
             const apiHash = process.env.TELEGRAM_API_HASH || "";
-            const session = new StringSession(process.env.TELEGRAM_SESSION || "");
+            const sessionStr = process.env.TELEGRAM_SESSION || "";
 
-            if (!apiId || !apiHash || !process.env.TELEGRAM_SESSION) {
+            if (!apiId || !apiHash || !sessionStr) {
                 console.warn("[Loot] Missing Telegram API credentials. Falling back to public searches only.");
                 return null;
             }
 
-            client = new TelegramClient(session, apiId, apiHash, {
-                connectionRetries: 5,
+            const session = new StringSession(sessionStr);
+            const client = new TelegramClient(session, apiId, apiHash, {
+                connectionRetries: 3,
             });
 
             await client.connect();
+            globalThis._telegramClient = client;
             console.log("✅ [Loot] Telegram connected!");
             return client;
-        } catch (e) {
-            console.error("[Loot] Telegram connection failed:", e);
-            connectionPromise = null;
+        } catch (e: unknown) {
+            const err = e as { errorMessage?: string; message?: string };
+            if (err.errorMessage === "AUTH_KEY_DUPLICATED" || err.message?.includes("AUTH_KEY_DUPLICATED")) {
+                console.warn("[Loot] Telegram session key duplicated or reused elsewhere. Disconnecting and using fallback.");
+            } else {
+                console.error("[Loot] Telegram connection failed:", e);
+            }
+            if (globalThis._telegramClient) {
+                try { await globalThis._telegramClient.disconnect(); } catch { /* Ignore */ }
+            }
+            globalThis._telegramClient = null;
+            globalThis._telegramConnPromise = null;
             return null;
         }
     })();
 
-    return connectionPromise;
+    return globalThis._telegramConnPromise;
 }
 
 export async function searchLootProducts(query: string): Promise<NormalizedProduct[]> {
@@ -100,7 +115,7 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
                 let entity;
                 try {
                     entity = await telegramClient.getEntity(channelName);
-                } catch (e) {
+                } catch {
                     try {
                         entity = await telegramClient.getEntity(`@${channelName}`);
                     } catch (e2) {
@@ -182,7 +197,7 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
             const res = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
             const data = await res.json();
             if (data.organic_results) {
-                allDeals = data.organic_results.map((r: any) => ({
+                allDeals = data.organic_results.map((r: { title: string; snippet?: string; link: string }) => ({
                     title: r.title.replace(/Telegram: Contact @\w+\s*/i, '').trim(),
                     description: r.snippet, link: r.link, channel: 'Search', isDirect: false
                 }));
@@ -320,8 +335,4 @@ function findBestAffiliateLink(links: string[]): string | null {
         if (score > highScore) { highScore = score; bestLink = l; }
     }
     return bestLink;
-}
-function extractLinksFromText(text: string): string[] {
-    const urlRegex = /https?:\/\/[^\s\)]+(?<![\.\,\!\?\)])/g;
-    return text.match(urlRegex) || [];
 }

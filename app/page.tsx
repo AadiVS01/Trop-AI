@@ -1,21 +1,22 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { NormalizedProduct } from "@/lib/shopping/serpProvider";
 import { FlightResult, HotelResult } from "@/lib/travel/serpTravelProvider";
 import { LootDeal } from "@/lib/deals/lootProvider";
-
-
+import { Guide } from "@/lib/guides/guideService";
+import { TrainResult, TrainClassAvailability } from "@/lib/travel/trainProvider";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 type MessageItem =
   | { kind: "chat"; role: "user" | "assistant"; content: string }
   | { kind: "products"; query: string; products: NormalizedProduct[]; followUp?: string }
-  | { kind: "guide"; guide: any; bundles: { category: string; products: NormalizedProduct[] }[]; followUp?: string }
+  | { kind: "guide"; guide: Guide; bundles: { category: string; products: NormalizedProduct[] }[]; followUp?: string }
   | { kind: "flights"; flights: FlightResult[]; followUp?: string }
   | { kind: "hotels"; hotels: HotelResult[]; followUp?: string }
-  | { kind: "trains"; trains: any[]; followUp?: string }
+  | { kind: "trains"; trains: TrainResult[]; followUp?: string }
   | { kind: "loot"; deals: LootDeal[]; query?: string; followUp?: string };
 
 type Mode = "landing" | "chat";
@@ -303,7 +304,7 @@ function ProductCard({ prod }: { prod: NormalizedProduct }) {
 function ProductResults({ query, products }: { query: string; products: NormalizedProduct[] }) {
   return (
     <div style={p.wrap}>
-      <p style={p.label}>{products.length} results for <strong>"{query}"</strong></p>
+      <p style={p.label}>{products.length} results for <strong>&quot;{query}&quot;</strong></p>
       <div style={p.list}>
         {products.map((prod) => <ProductCard key={prod.id} prod={prod} />)}
       </div>
@@ -398,7 +399,7 @@ function HotelResults({ hotels }: { hotels: HotelResult[] }) {
   );
 }
 
-function TrainResults({ trains }: { trains: any[] }) {
+function TrainResults({ trains }: { trains: TrainResult[] }) {
   if (!trains.length) return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
@@ -433,7 +434,7 @@ function TrainResults({ trains }: { trains: any[] }) {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "0.5rem", marginTop: "1.25rem" }}>
-              {t.classAvailability?.map((avail: any, ai: number) => {
+              {t.classAvailability?.map((avail: TrainClassAvailability, ai: number) => {
                 const isAvailable = avail.displayStatus.includes("AVL") || avail.displayStatus.includes("Available");
                 const isRegret = avail.displayStatus.toLowerCase().includes("regret");
                 const color = isAvailable ? "#4ade80" : isRegret ? "#ef4444" : "#facc15";
@@ -463,14 +464,7 @@ function TrainResults({ trains }: { trains: any[] }) {
               })}
             </div>
           </div>
-          {t.lootDeals && t.lootDeals.map((loot: any, li: number) => (
-            <a key={li} href={loot.link} target="_blank" style={s.travelLoot}>
-              <span style={s.travelLootTag}>🔥 FEATURED LOOT</span>
-              <span style={{ fontSize: "0.75rem", color: "#4ade80", fontWeight: 700 }}>{loot.price ? `${loot.price} Discount` : "Special Deal"}</span>
-              {loot.coupon && <span style={{ fontSize: "0.7rem", color: "#60a5fa", fontWeight: 600 }}>CODE: {loot.coupon}</span>}
-              <span style={{ fontSize: "0.75rem", color: "#888", marginLeft: "auto", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loot.title}</span>
-            </a>
-          ))}
+          {t.link && null}
         </div>
       ))}
     </div>

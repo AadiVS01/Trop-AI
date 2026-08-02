@@ -102,7 +102,7 @@ export async function searchAmazonProducts(query: string, country: string = "IN"
     }
 }
 
-export async function getAmazonBestSellers(country: string = "IN"): Promise<NormalizedProduct[]> {
+export async function getAmazonBestSellers(): Promise<NormalizedProduct[]> {
     const apiKey = process.env.RAPIDAPI_KEY;
     const host = process.env.RAPIDAPI_HOST;
 
