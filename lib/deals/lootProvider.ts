@@ -89,7 +89,7 @@ export async function searchLootProducts(query: string): Promise<NormalizedProdu
 export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
     const cacheKey = query || "all";
     if (lootCache[cacheKey] && (Date.now() - lootCache[cacheKey].timestamp) < CACHE_TTL) {
-        console.log(`[Loot] Returning cached deals for: ${cacheKey}`);
+        console.log(`[Loot Engine] ⚡ Engine: IN-MEMORY CACHE (Key: "${cacheKey}", Deals: ${lootCache[cacheKey].deals.length})`);
         return lootCache[cacheKey].deals;
     }
 
@@ -105,12 +105,12 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
     if (telegramClient) {
         const travelQueries = ["flight", "hotel", "train", "bus"];
         const channelsToScrape = travelQueries.includes(query || "") ? ["desidime"] : CHANNELS;
+        console.log(`[Loot Engine] 📡 Engine: TELEGRAM LIVE SCRAPER (Channels: ${channelsToScrape.join(", ")})`);
 
         for (const channelName of channelsToScrape) {
             try {
                 let channelDealsCount = 0;
                 let offsetId = 0;
-                console.log(`[Loot] Deep scraping @${channelName}...`);
 
                 let entity;
                 try {
@@ -119,7 +119,7 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
                     try {
                         entity = await telegramClient.getEntity(`@${channelName}`);
                     } catch (e2) {
-                        console.error(`[Loot] Could not resolve entity for ${channelName}:`, e2);
+                        console.error(`[Loot Engine] Could not resolve entity for @${channelName}:`, e2);
                         continue;
                     }
                 }
@@ -129,13 +129,6 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
                         limit: 100,
                         offsetId: offsetId > 0 ? offsetId : undefined
                     }) as Api.Message[];
-
-                    if (channelName === 'desidime') {
-                        console.log(`[Loot] Fetched ${messages.length} messages from @desidime`);
-                        if (messages.length > 0) {
-                            console.log(`[Loot] Sample msg: ${messages[0].message?.slice(0, 100)}`);
-                        }
-                    }
 
                     if (messages.length === 0) break;
 
@@ -187,22 +180,27 @@ export async function fetchTrendingDeals(query?: string): Promise<LootDeal[]> {
                     offsetId = messages[messages.length - 1].id;
                 }
             } catch (e) {
-                console.error(`[Loot] Failed to fetch from Telegram channel ${channelName}:`, e);
+                console.error(`[Loot Engine] Failed to fetch from Telegram channel @${channelName}:`, e);
             }
         }
-    } else if (query && SERP_API_KEY) {
+    }
+
+    // Fallback to SerpAPI if Telegram produced 0 deals or client was not authenticated
+    if (allDeals.length === 0 && SERP_API_KEY) {
+        const searchTerm = (query && query !== "none") ? query : "shopping deals OR loot deals";
+        console.log(`[Loot Engine] 🔍 Engine: SERPAPI WEB SEARCH FALLBACK (Search: "${searchTerm}")`);
         try {
-            const siteQuery = `site:t.me/s/LootAlerts OR site:t.me/s/DesiDime OR site:t.me/s/gymdeals "${query}"`;
+            const siteQuery = `site:t.me/s/LootAlerts OR site:t.me/s/DesiDime OR site:t.me/s/gymdeals "${searchTerm}"`;
             const params = new URLSearchParams({ engine: "google", q: siteQuery, tbs: "qdr:m", api_key: SERP_API_KEY });
             const res = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
             const data = await res.json();
             if (data.organic_results) {
                 allDeals = data.organic_results.map((r: { title: string; snippet?: string; link: string }) => ({
                     title: r.title.replace(/Telegram: Contact @\w+\s*/i, '').trim(),
-                    description: r.snippet, link: r.link, channel: 'Search', isDirect: false
+                    description: r.snippet, link: r.link, channel: 'SerpAPI Search', isDirect: false
                 }));
             }
-        } catch (e) { console.error("SerpAPI fallback failed:", e); }
+        } catch (e) { console.error("[Loot Engine] SerpAPI fallback failed:", e); }
     }
 
     allDeals = allDeals.sort((a, b) => (new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()));
