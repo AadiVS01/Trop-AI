@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { searchProducts } from "@/lib/shopping/serpProvider";
+import { searchProducts, NormalizedProduct } from "@/lib/shopping/serpProvider";
 import { searchAmazonProducts } from "@/lib/shopping/amazonProvider";
 import { searchFlights, searchHotels } from "@/lib/travel/serpTravelProvider";
 import { fetchTrendingDeals, searchLootProducts } from "@/lib/deals/lootProvider";
@@ -27,6 +27,8 @@ export interface ParsedTrainIntent {
 
 export interface ParsedSearchIntent {
     query: string;
+    brand?: string;
+    max_price?: number;
 }
 
 export interface ParsedLootIntent {
@@ -92,11 +94,26 @@ export async function handleHotel(parsed: ParsedHotelIntent) {
 
 export async function handleTrain(parsed: ParsedTrainIntent) {
     const { from, to, date } = parsed;
-    if (!from || !to || !date || from === "unknown" || to === "unknown") {
-        return NextResponse.json({ type: "chat", reply: "I can help with train bookings! Just let me know the stations and the date. 🚂" });
+    const missingFrom = !from || from === "unknown";
+    const missingTo = !to || to === "unknown";
+    const missingDate = !date || date === "unknown";
+
+    if (missingFrom || missingTo || missingDate) {
+        if (missingFrom && missingTo) {
+            return NextResponse.json({ type: "chat", reply: "I'd love to help you book a train! Where are you departing from and where to? (and what date?) 🚂" });
+        }
+        if (missingFrom) {
+            return NextResponse.json({ type: "chat", reply: `Got it! Traveling to ${to}. Which station or city are you departing from? 🚂` });
+        }
+        if (missingTo) {
+            return NextResponse.json({ type: "chat", reply: `Got it! Departing from ${from}. What destination station or city are you heading to? 🚂` });
+        }
+        if (missingDate) {
+            return NextResponse.json({ type: "chat", reply: `Got it! Train from ${from} to ${to}. What date would you like to travel? 🗓️` });
+        }
     }
     const { searchTrains } = await import("@/lib/travel/trainProvider");
-    const trains = await searchTrains(from, to, date);
+    const trains = await searchTrains(from!, to!, date!);
     return NextResponse.json({
         type: "trains",
         trains,
@@ -104,6 +121,38 @@ export async function handleTrain(parsed: ParsedTrainIntent) {
             ? "I've found the best live availability for your journey! 🚂🔥"
             : "I couldn't find any live train availability for those stations. Want to try different dates or stations?"
     });
+}
+
+function calculateTrustScore(p: NormalizedProduct): number {
+    const lootBoost = p.source?.includes("LOOT") ? 15 : 0;
+    const rating = p.rating ?? 0;
+    const reviews = p.reviews ?? 0;
+    // High star ratings with high review counts get highest priority
+    return lootBoost + (rating * Math.log1p(reviews));
+}
+
+function filterAndRankProducts(products: NormalizedProduct[], targetBrand?: string): NormalizedProduct[] {
+    // Sort all products by Star Rating and Review Count trust score descending
+    const sortedByRating = [...products].sort((a, b) => calculateTrustScore(b) - calculateTrustScore(a));
+
+    if (!targetBrand || targetBrand === "none" || targetBrand === "unknown") {
+        return sortedByRating;
+    }
+
+    const brandLower = targetBrand.toLowerCase().trim();
+    const brandMatches: NormalizedProduct[] = [];
+    const nonMatches: NormalizedProduct[] = [];
+
+    for (const p of sortedByRating) {
+        if (p.title.toLowerCase().includes(brandLower)) {
+            brandMatches.push(p);
+        } else {
+            nonMatches.push(p);
+        }
+    }
+
+    // Prioritize high-rated brand matches first, followed by remaining high-rated items
+    return brandMatches.length > 0 ? [...brandMatches, ...nonMatches] : sortedByRating;
 }
 
 export async function handleSearch(parsed: ParsedSearchIntent) {
@@ -114,13 +163,25 @@ export async function handleSearch(parsed: ParsedSearchIntent) {
         searchLootProducts(query)
     ]);
 
-    // Prioritize Amazon and Loot results
-    const combined = [...loots, ...amazonProducts, ...serpProducts].slice(0, 10);
+    // Deduplicate by product title similarity / URL
+    const seen = new Set<string>();
+    const allProducts: NormalizedProduct[] = [];
+
+    for (const p of [...loots, ...amazonProducts, ...serpProducts]) {
+        const key = p.title.toLowerCase().trim();
+        if (!seen.has(key)) {
+            seen.add(key);
+            allProducts.push(p);
+        }
+    }
+
+    // Rank by Rating, Review count trust score, and target brand
+    const ranked = filterAndRankProducts(allProducts, parsed.brand).slice(0, 10);
 
     return NextResponse.json({
         type: "products",
         query: query,
-        products: combined,
+        products: ranked,
         followUp: loots.length > 0
             ? "I found some exclusive flash deals for this! Look for the 🔥 LOOT badge."
             : "Found these high-rated options for you! Anything specific you're looking for?"
@@ -130,13 +191,20 @@ export async function handleSearch(parsed: ParsedSearchIntent) {
 export async function handleLoot(parsed: ParsedLootIntent) {
     const query = parsed.query && parsed.query !== "none" ? parsed.query : undefined;
     const deals = await fetchTrendingDeals(query);
+
+    // If a specific product query returned 0 Telegram flash deals, automatically fall back to multi-provider search (Amazon + SerpAPI + Loot)
+    if (query && deals.length === 0) {
+        console.log(`[Loot Handler] No live flash deals found for "${query}". Falling back to full multi-provider search (Amazon + SerpAPI)...`);
+        return handleSearch({ query });
+    }
+
     return NextResponse.json({
         type: "loot",
         deals,
         query,
         followUp: deals.length > 0
             ? "These are the hottest loot deals right now! Move fast, they usually expire in minutes. 🔥"
-            : "I couldn't find any specific live loot for that right now. Checking these other trending deals instead..."
+            : "I couldn't find any live loot deals right now. Want to search for regular product prices?"
     });
 }
 

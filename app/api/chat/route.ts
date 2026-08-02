@@ -6,19 +6,33 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-async function callGroq(messages: object[], model = "llama-3.1-8b-instant", temperature = 0.3): Promise<string> {
+async function callGroq(messages: object[], model = "llama-3.1-8b-instant", temperature = 0.3, retries = 2): Promise<string> {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error("GROQ_API_KEY not set");
 
-    const res = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages, temperature }),
-    });
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (!res.ok) throw new Error(`Groq error: ${res.status}`);
-    const data = await res.json();
-    return data?.choices?.[0]?.message?.content ?? "";
+            const res = await fetch(GROQ_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+                body: JSON.stringify({ model, messages, temperature }),
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) throw new Error(`Groq error: ${res.status}`);
+            const data = await res.json();
+            return data?.choices?.[0]?.message?.content ?? "";
+        } catch (err: unknown) {
+            if (attempt === retries) throw err;
+            console.warn(`[Groq API] Connection attempt ${attempt + 1} failed. Retrying in ${(attempt + 1)}s...`);
+            await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+    }
+    return "";
 }
 
 function countConstraints(parsed: Record<string, unknown>): number {
@@ -70,25 +84,25 @@ If the user asks about ANYTHING else (e.g., general knowledge, cooking, sports, 
 Given context and message, return JSON ONLY.
 
 Rules:
-- If use says "i want to travel" or "plan a trip" WITHOUT mentioning Flight or Train, use "travel_generic".
-- If user HAS mentioned a mode (e.g. "book a flight"), you MUST use that specific intent (e.g. "flight"), NOT "travel_generic".
+- CRITICAL: Always merge details from "Recent context" with the latest message. If "Recent context" has departure/destination cities or travel intent, carry them forward.
+- CRITICAL: Always convert natural language dates (e.g., "30th august", "tomorrow", "next Friday", "aug 30") into standard "YYYY-MM-DD" format using Today (${today}).
+- If user says "i want to travel" or "plan a trip" WITHOUT mentioning Flight or Train, use "travel_generic".
+- If user HAS mentioned a mode (e.g. "book a flight" or "train from..."), use that specific intent ("flight" or "train").
 - Do NOT trigger "loot" or "search" for simple acknowledgments like "ok", "yes", "sure", "thanks", "fine". These should be "chat".
-- Only use "loot" or "search" if it's a NEW request for products.
 
 Intents:
-1. "flight" — user wants a flight. Even if cities/dates are missing, use this. Returns: {"intent":"flight", "from":"<IATA|unknown>", "to":"<IATA|unknown>", "date":"YYYY-MM-DD|unknown", "return_date":"YYYY-MM-DD|none"}
-   - Resolve city/state to 3-letter IATA airport codes (Pune: PNQ, Delhi: DEL, Mumbai: BOM).
-   - Resolve partial dates based on Today: ${today}.
+1. "flight" — user wants a flight. Returns: {"intent":"flight", "from":"<IATA|unknown>", "to":"<IATA|unknown>", "date":"YYYY-MM-DD|unknown", "return_date":"YYYY-MM-DD|none"}
+   - Resolve city/state to 3-letter IATA airport codes (Pune: PNQ, Delhi: DEL, Mumbai: BOM, Kerala/Kochi: COK).
 2. "hotel" — {"intent":"hotel", "location":"<city|unknown>", "check_in":"YYYY-MM-DD|unknown", "check_out":"YYYY-MM-DD|unknown", "max_price":<number|null>}
-   - Extract destination and dates.
 3. "train" — {"intent":"train", "from":"<station/city|unknown>", "to":"<station/city|unknown>", "date":"YYYY-MM-DD|unknown"}
 4. "travel_generic" — user wants a trip/holiday but has NOT mentioned if it's a Flight or Train.
 6. "guide" — {"intent":"guide", "category":"fashion|health|furniture|unknown", "query":"<query>", "guideId":"<id|none>", "stepIndex":<number|null>}
-7. "search" — {"intent":"search", "query":"<query>"}
-8. "loot" — {"intent":"loot", "query":"<query|none>"}
+7. "search" — {"intent":"search", "query":"<query>", "brand":"<brand name|none>", "max_price":<number|null>}
+   - Dynamically extract any brand mentioned by the user (e.g. "adidas", "nike", "apple", "zara", "seiko", "nothing", etc.). If no brand is specified, return "none".
+8. "loot" — {"intent":"loot", "query":"<query|none>"} — Use ONLY when user explicitly asks for "deals", "loot", "offers", "coupons", or "discounts" (e.g., "show me deals", "best offers").
 9. "chat" — greetings, polite talk, or simple acknowledgments ("ok", "got it").
-9. "out_of_scope" — anything not shopping or travel.
-10. "clarify" — {"intent":"clarify", "reply":"<question for missing info>"}`,
+10. "out_of_scope" — anything not shopping or travel.
+11. "clarify" — {"intent":"clarify", "reply":"<question for missing info>"}`,
             },
             ...(contextSummary ? [{ role: "user", content: `Recent context:\n${contextSummary}` }] : []),
             { role: "user", content: message },

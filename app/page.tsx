@@ -261,8 +261,21 @@ export default function ChatPage() {
   );
 }
 
+function decodeHtmlEntities(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
 function ProductCard({ prod }: { prod: NormalizedProduct }) {
   const isLoot = prod.source?.includes("LOOT");
+  const cleanTitle = decodeHtmlEntities(prod.title);
   return (
     <a
       href={prod.productUrl ?? "#"}
@@ -275,12 +288,12 @@ function ProductCard({ prod }: { prod: NormalizedProduct }) {
           LOOT
         </div>
       )}
-      {prod.thumbnail && <img src={prod.thumbnail} alt={prod.title} style={p.img} />}
+      {prod.thumbnail && <img src={prod.thumbnail} alt={cleanTitle} style={p.img} />}
       {!prod.thumbnail && isLoot && (
         <div style={{ ...p.img, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem" }}>🔥</div>
       )}
       <div style={p.info}>
-        <span style={p.title}>{prod.title}</span>
+        <span style={p.title}>{cleanTitle}</span>
         <div style={p.meta}>
           {prod.price != null && <span style={p.price}>₹{prod.price.toLocaleString("en-IN")}</span>}
           {prod.priceStr && prod.price == null && <span style={p.price}>{prod.priceStr}</span>}
@@ -742,15 +755,17 @@ const s: Record<string, React.CSSProperties> = {
 };
 
 function LootCard({ deal }: { deal: LootDeal }) {
+  const cleanTitle = decodeHtmlEntities(deal.title);
+  const cleanDesc = deal.description ? decodeHtmlEntities(deal.description) : "";
   return (
     <a href={deal.link} target="_blank" style={{ ...s.lootCard, textDecoration: "none" }}>
       <div style={s.lootBadge}>LOOT</div>
       <div style={p.info}>
-        <div style={p.title}>{deal.title}</div>
+        <div style={p.title}>{cleanTitle}</div>
         {deal.price && <span style={s.lootPrice}>{deal.price}</span>}
-        {deal.description && (
+        {cleanDesc && (
           <p style={{ ...s.hotelDesc, height: "auto", WebkitLineClamp: 1, display: "-webkit-box", WebkitBoxOrient: "vertical", margin: "0.25rem 0 0 0" }}>
-            {deal.description}
+            {cleanDesc}
           </p>
         )}
         {deal.coupon && (
