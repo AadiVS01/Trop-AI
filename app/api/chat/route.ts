@@ -6,7 +6,7 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-async function callGroq(messages: object[], model = "llama-3.1-8b-instant", temperature = 0.3, retries = 2): Promise<string> {
+async function callGroq(messages: object[], model = "openai/gpt-oss-120b", temperature = 0.3, retries = 2): Promise<string> {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error("GROQ_API_KEY not set");
 
