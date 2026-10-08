@@ -109,7 +109,7 @@ Intents:
         ];
 
         // Step 1: Classify intent and extract variables using the cheap model first
-        let modelUsed = "llama-3.1-8b-instant";
+        let modelUsed = "openai/gpt-oss-20b";
         let classifyRaw = await callGroq(classifyMessages, modelUsed, 0.0);
         let parsed: Record<string, unknown> = {};
         try {
@@ -123,7 +123,7 @@ Intents:
 
         // Step 2: Escalate to the expert model if it's a complex query (> 3 constraints)
         if (constraintCount > 3) {
-            modelUsed = "llama-3.3-70b-versatile";
+            modelUsed = "openai/gpt-oss-120b";
             console.log(`[Hybrid Routing] Escalating to expert model (${modelUsed}) for complex query.`);
             classifyRaw = await callGroq(classifyMessages, modelUsed, 0.0);
             try {
@@ -170,7 +170,7 @@ Intents:
                     ...history,
                     { role: "user", content: message }
                 ];
-                const reply = await callGroq(restrictedHistory, "llama-3.3-70b-versatile", 0.8);
+                const reply = await callGroq(restrictedHistory, "openai/gpt-oss-120b", 0.8);
                 return NextResponse.json({ type: "chat", reply });
         }
     } catch (e: unknown) {
