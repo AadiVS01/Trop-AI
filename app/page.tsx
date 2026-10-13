@@ -66,6 +66,8 @@ export default function ChatPage() {
         setItems([...newItems, { kind: "hotels", hotels: data.hotels, followUp: data.followUp }]);
       } else if (data.type === "trains") {
         setItems([...newItems, { kind: "trains", trains: data.trains, followUp: data.followUp }]);
+      } else if (data.type === "loot") {
+        setItems([...newItems, { kind: "loot", deals: data.deals, query: data.query, followUp: data.followUp }]);
       } else {
         const reply = data.reply ?? "Something went wrong.";
         setItems([...newItems, { kind: "chat", role: "assistant", content: reply }]);
